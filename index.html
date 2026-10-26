@@ -400,6 +400,8 @@ details.help summary { cursor: pointer; } details.help ul { margin: 6px 0 0; pad
 .title .tt-row { display: flex; gap: 10px; } .title .tt-row .btn { flex: 1; }
 .modal { flex-direction: column; }
 .talk .tb { flex-wrap: wrap; }
+.skiplink { margin-top: 14px; color: #e9d6b0; font-size: .95rem; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.skiplink[hidden] { display: none; }
 .talk .tb .tskip { order: 9; flex-basis: 100%; text-align: right; background: none; color: var(--ink-dim); font-size: .72rem; padding: 2px 0 0; text-decoration: underline; }
 .modal.dark { background: radial-gradient(ellipse at 50% 40%, #3a2a1c, #140e08 75%); }
 .modal .box { width: 100%; max-width: 360px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
@@ -3491,7 +3493,7 @@ function updateTop() {
 // 設定・物語・チュートリアル
 // ======================================================================
 const modalOpen = () => !$('modal').hidden;
-function closeModal() { $('modal').hidden = true; $('modal').onclick = null; $('modal').classList.remove('dark'); }
+function closeModal() { if ($('st-skip')) $('st-skip').hidden = true; $('modal').hidden = true; $('modal').onclick = null; $('modal').classList.remove('dark'); }
 let settingsArmed = false;
 function showSettings() {
   const sp = [[0, '止める'], [1, '×1'], [2, '×2'], [4, '×4']];
@@ -3650,6 +3652,11 @@ function showStory(k) {
     if (!S.storySeen) { S.storySeen = true; S.tut.on = true; S.guide = { i:0, t:NOW }; save(); renderMission(); renderGuide(true); }
   };
   if ($('st-back')) $('st-back').onclick = () => showStory(k - 1);
+  // 箱の下に、文字だけのリンク：物語を飛ばして開拓をはじめる
+  let sk = $('st-skip');
+  if (!sk) { sk = document.createElement('a'); sk.id = 'st-skip'; sk.href = '#'; sk.className = 'skiplink'; sk.textContent = 'ストーリーをスキップ'; $('modal').appendChild(sk); }
+  sk.hidden = false;
+  sk.onclick = e => { e.preventDefault(); showStory(pages.length - 1); $('st-next').click(); };
 }
 
 // ======================================================================
