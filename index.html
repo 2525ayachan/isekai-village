@@ -407,6 +407,11 @@ details.help summary { cursor: pointer; } details.help ul { margin: 6px 0 0; pad
 .title .tt-row { display: flex; gap: 10px; } .title .tt-row .btn { flex: 1; }
 .modal { flex-direction: column; }
 .talk .tb { flex-wrap: wrap; }
+.skeep { display: grid; grid-template-columns: 20px 1fr auto; gap: 6px 8px; align-items: center; font-size: .82rem; }
+.skeep img { width: 16px; height: 16px; image-rendering: pixelated; }
+.skeep small { color: var(--ink-dim); }
+.skeep .kn { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.skeep .kn b { font-weight: 400; min-width: 3.2em; text-align: center; }
 .skiplink { margin-top: 14px; color: #e9d6b0; font-size: .95rem; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .skiplink[hidden] { display: none; }
 .talk .tb .tskip { order: 9; flex-basis: 100%; text-align: right; background: none; color: var(--ink-dim); font-size: .72rem; padding: 2px 0 0; text-decoration: underline; }
@@ -1658,10 +1663,22 @@ function buyFrom(k, n) {
   }
   return c;
 }
+// 自動で売るときに倉庫に残す数（品物ごとに変えられる。-1は売らない）
+const keepDef = k => NO_AUTOSELL.has(k) ? 150 : 30;
+const keepOf = k => S.sellKeep && S.sellKeep[k] != null ? S.sellKeep[k] : keepDef(k);
+function sellKeepHTML() {
+  const ks = ITEM_KEYS.filter(k => (S.inv[k] || 0) >= 1 || (S.sellKeep && S.sellKeep[k] != null));
+  if (!ks.length) return '';
+  return moreHTML('sellkeep', '品物ごとに残す数を決める', `<p class="fxn">残す数を超えた分だけ売る。「売らない」にした品は自動では売らない。</p><div class="skeep">${ks.map(k => { const v = keepOf(k), off = v < 0;
+    return `<img src="${ICON[k]}" alt=""><span>${ITEMS[k].name}<br><small>在庫${num(S.inv[k] || 0)}</small></span>
+      <span class="kn">${off ? '<b>売らない</b>' : `<button class="mini" data-act="skeep" data-k="${k}" data-d="-10">−10</button><button class="mini" data-act="skeep" data-k="${k}" data-d="-1">−</button><b>${v}個</b><button class="mini" data-act="skeep" data-k="${k}" data-d="1">＋</button><button class="mini" data-act="skeep" data-k="${k}" data-d="10">＋10</button>`}
+      <button class="mini" data-act="snosell" data-k="${k}">${off ? '売る' : '売らない'}</button></span>`; }).join('')}</div>`);
+}
 function autoSell() {
   const sold = [];
   for (const k of ITEM_KEYS) {
-    const ex = Math.floor((S.inv[k] || 0) - (NO_AUTOSELL.has(k) ? 150 : 30));
+    const keep = keepOf(k); if (keep < 0) continue;   // 売らない品
+    const ex = Math.floor((S.inv[k] || 0) - keep);
     if (ex > 0) { const n = Math.min(ex, 20); sellTo(k, n); sold.push(`${resName(k)}${n}`); }
   }
   if (sold.length) toast(`余った品を行商人に自動で売った：${sold.join('・')}`);
@@ -4533,7 +4550,7 @@ function storeTab() {
 }
 function merchantTab() {
   const h = S.min / 60;
-  const html = `<label class="toggle"><input type="checkbox" id="autosell" ${S.autoSell ? 'checked' : ''}> 30個を超えた分を自動で売る（木材・石材は150個）</label>`;
+  const html = `<label class="toggle"><input type="checkbox" id="autosell" ${S.autoSell ? 'checked' : ''}> 残す数を超えた分を自動で売る（ふつうは30個、木材・石材は150個を残す）</label>${S.autoSell ? sellKeepHTML() : ''}`;
   if (!merHere()) {
     const next = h < 9 && S.mer.day !== S.day ? '今日の9:00' : `明日（${S.day + 1}日目）の9:00`;
     return html + `<p>毎日9:00〜16:00に広場へ来ます。次は${next}。</p>${orderHTML()}`;
@@ -4958,7 +4975,7 @@ $('panel').addEventListener('pointerdown', () => { panelBusy = Date.now() + 2000
 $('panel').addEventListener('pointerup', () => { setTimeout(() => { panelBusy = 0; }, 80); });
 $('panel').addEventListener('pointercancel', () => { panelBusy = 0; });
 $('panel').addEventListener('change', e => {
-  if (e.target.id === 'autosell') { S.autoSell = e.target.checked; save(); }
+  if (e.target.id === 'autosell') { S.autoSell = e.target.checked; save(); lastHTML = ''; renderPanel(true); }
   if (e.target.dataset.keep != null) { const t = S.tiles[+e.target.dataset.keep]; if (t) { t.keepOff = !e.target.checked; save(); lastHTML = ''; renderPanel(true); } }
 });
 
@@ -5041,6 +5058,10 @@ $('panel').addEventListener('click', e => {
     S.dismiss.k[b.dataset.k] = 1; renderPanel(true);
   } else if (act === 'vtab') {
     vTab = b.dataset.k; lastHTML = '';
+  } else if (act === 'skeep') {
+    const k = b.dataset.k; S.sellKeep = S.sellKeep || {}; S.sellKeep[k] = clamp(Math.max(0, keepOf(k)) + +b.dataset.d, 0, 999); save();
+  } else if (act === 'snosell') {
+    const k = b.dataset.k; S.sellKeep = S.sellKeep || {}; S.sellKeep[k] = keepOf(k) < 0 ? keepDef(k) : -1; save();
   } else if (act === 'psort') {
     peopleSort = b.dataset.k;
     try { localStorage.setItem('isekai-people-sort', peopleSort); } catch (err) {}
