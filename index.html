@@ -1897,6 +1897,11 @@ function migrateSave(s) {
     if (r.home != null && !s.tiles[r.home]) r.home = null;
   });
   Object.keys(s.inv).forEach(k => { if (!ITEMS[k] || !(s.inv[k] >= 0)) delete s.inv[k]; });
+  // チュートリアルを終えた村（「目標」が使えるようになったあと）は、終えたことにする
+  if (s.guide && !s.guide.done && s.storySeen) {
+    const mi = TALK.findIndex(st => st.unlock === 'mission');
+    if ((s.tut && (s.tut.g > 0 || s.tut.goalDone)) || (s.unlock && s.unlock.mission && s.guide.i >= GUIDE.length + mi)) s.guide.done = true;
+  }
   // ここに版ごとの直し方を足していく（例：if (s.v < 25) { ... }）
   s.v = Math.max(s.v, SAVE_VER);
   return s;
@@ -3770,7 +3775,7 @@ function tutSkipAll() {
   const from = Math.max(0, (S.guide.i || 0) - GUIDE.length);
   TALK.slice(from).forEach(st => { if (st.gold) earn('goal', st.gold); if (st.wood) add('wood', st.wood); });
   S.flags.road = S.flags.moved = 1;
-  S.guide = { i: GUIDE.length + TALK.length, t: NOW };
+  S.guide = { i: GUIDE.length + TALK.length, t: NOW, done: true };
   ['people', 'village', 'mission'].forEach(v => unlock(v, true));
   earn('goal', G_REWARD); S.tut.seen = -1;
   DEM = demand(); assign(); lastX = context();
@@ -4067,7 +4072,8 @@ const TALK = [
   { who:0, t:'頼りにしとるぞ、旅人さん。村をもう一度にぎやかにしておくれ。', next:true },
 ];
 const G_REWARD = 100;
-const guideActive = () => S && S.storySeen && S.guide && S.guide.i < GUIDE.length + TALK.length;
+// チュートリアルを終えたかどうかは guide.done で覚える（手順の数が変わっても、終えた村がやり直しにならないように）
+const guideActive = () => S && S.storySeen && S.guide && !S.guide.done && S.guide.i < GUIDE.length + TALK.length;
 const stepAt = () => S.guide.i < GUIDE.length ? GUIDE[S.guide.i] : TALK[S.guide.i - GUIDE.length];
 const guideStep = () => { if (!guideActive()) return null; const st = stepAt(); return st && (S.guide.i < GUIDE.length || st.guide) ? st : null; };
 const talkStep = () => { if (!guideActive() || S.guide.i < GUIDE.length) return null; const st = stepAt(); return st && !st.guide ? st : null; };
@@ -4076,6 +4082,7 @@ function guideNext() {
   if (cur && cur.wood) add('wood', cur.wood);
   if (cur && cur.gold) { earn('goal', cur.gold); toast(`ごほうび +${cur.gold}ゴールド`); }
   S.guide.i++; S.guide.t = NOW;
+  if (S.guide.i >= GUIDE.length + TALK.length) S.guide.done = true;
   { const nx = guideActive() && stepAt(); if (nx && nx.enter) nx.enter(); }
   save();
   if (!guideActive()) {
@@ -4085,7 +4092,7 @@ function guideNext() {
   }
   lastTalk = ''; renderGuide(true);
 }
-function guideSkip() { S.guide.i = GUIDE.length + TALK.length; ['people', 'village', 'mission'].forEach(v => unlock(v, true)); save(); lastTalk = ''; renderGuide(true); renderMission(); }
+function guideSkip() { S.guide.i = GUIDE.length + TALK.length; S.guide.done = true; ['people', 'village', 'mission'].forEach(v => unlock(v, true)); save(); lastTalk = ''; renderGuide(true); renderMission(); }
 function stopMg() { S.mg = null; if (roadMode) $('roadbtn').click(); lastGuideKey = ''; renderGuide(true); }
 // 暗いところを押したとき：ミッションの案内なら「やめる」と同じ。チュートリアルなら案内を置き直す
 [0, 1, 2, 3].forEach(k => $('gb' + k).addEventListener('click', () => {
@@ -5276,7 +5283,7 @@ function start(data) {
   S.tiles.forEach(t => { if (t && B[t.b].animal && t.pets == null) t.pets = 2; });
   S.residents.forEach(r => { if (r.everJob == null) r.everJob = r.job != null; });
   if (!S.tut) S.tut = { i:0, on:true };
-  if (!S.guide) { S.guide = { i: S.storySeen ? GUIDE.length + TALK.length : 0 }; if (S.storySeen) S.tut.i = 0; }
+  if (!S.guide) { S.guide = { i: S.storySeen ? GUIDE.length + TALK.length : 0, done: !!S.storySeen }; if (S.storySeen) S.tut.i = 0; }
   if (!S.unlock) {
     if (guideActive()) { S.unlock = {}; S.guide.i = 0; }
     else S.unlock = { people:1, village:1, mission:1, store:1, merchant:1, growth:1 };
