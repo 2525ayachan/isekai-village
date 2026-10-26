@@ -217,6 +217,7 @@ details.more > *:not(summary) { margin-top: 8px; }
 .card img { grid-row: span 3; width: 32px; height: 48px; image-rendering: pixelated; }
 .card .nm { font-size: .92rem; }
 .card .fx { color: var(--ink-dim); font-size: .72rem; }
+.card .pk { grid-column: 1 / -1; font-size: .72rem; line-height: 1.45; color: var(--accent); border-top: 1px dashed rgba(90,58,34,.2); padding-top: 4px; margin-top: 2px; }
 .card.on { box-shadow: inset 0 0 0 2px var(--accent); }
 .card.on .nm::after { content: " ◀"; color: var(--accent); }
 .card:disabled { cursor: default; opacity: .55; }
@@ -1139,6 +1140,33 @@ function moveShips(dt, spd) {
 const KEEP_DEF = 20;
 const keepN = t => t.keepN != null ? t.keepN : KEEP_DEF;
 const keepsWheat = (t, rec) => (t.b === 'bakery' || t.b === 'diner') && rec.in.wheat && !t.keepOff && (S.inv.wheat || 0) - rec.in.wheat < keepN(t);
+// 建てると何がよくなるか（建てる画面に出す、ひとこと説明）
+const PERK = {
+  house:'住める人が3人ふえる。人がふえる条件のひとつ',
+  field:'麦や芋など作物がとれる。食べ物のもと',
+  coop:'麦をエサに卵がとれる。オムレツの材料',
+  sheep:'羊毛がとれる。雲の布の材料',
+  dragon:'卵をエサに竜の鱗がとれる。鎧の材料',
+  elf:'木材がとれる。建てる・直すのに使う',
+  mine:'石材と鉄鉱石がとれる',
+  lodge:'開拓者が森を切り開き、村が広がる',
+  mage:'マナが集まる。魔法の建物や森の奥の開拓に',
+  bakery:'パンやいちごパイを焼く。ご飯がおいしくなる',
+  diner:'スープやオムレツを作る。ご飯がおいしくなる',
+  weaver:'羊毛から雲の布を織る',
+  alchemy:'回復薬や魔法薬を作る',
+  smith:'剣や鎧を作る。倉庫の武具は防衛力になる',
+  tailor:'布とマナからローブを仕立てる',
+  tavern:'星の実酒を作る。憩いの場で満足度アップ',
+  warehouse:'倉庫の棚が広がる。配達係が品物を運ぶ',
+  school:'子供が学んで、仕事の早い熟練の大人に育つ',
+  inn:'宿代が毎日入り、泊まった旅人が住みつくことも',
+  spring:'村全体の生産+5%。憩いの場で満足度アップ',
+  guild:'冒険者が宝を稼ぎ、魔物を討伐する。防衛力+2/人',
+  watchtower:'防衛力+5（見張り番が1人必要）。盗賊に備える',
+  barracks:'防衛力+12（兵士2人で満点）。盗賊に備える',
+  castle:'生産が2倍になり、都がよみがえる',
+};
 const DECO_RANGE = 3, DECO_CAP = 15;
 function decoBonus(r, X) {
   if (r.home == null || !X || !X.decos || !X.decos.length) return 0;
@@ -4641,7 +4669,7 @@ function ruinHTML(o) {
     const d = B[b];
     if (pop < d.unlock) return `<button class="card locked" disabled><img src="${BICON[b]}" alt=""><span class="nm">${d.name}</span><span class="fx">住人${d.unlock}人で解放</span><span></span></button>`;
     const c = repairCost(b);
-    return `<button class="card" data-act="repair" data-type="${b}" data-ruin="${o.a}" ${canAfford(c) ? '' : 'disabled'}><img src="${BICON[b]}" alt=""><span class="nm">${d.name}</span><span class="fx">${d.desc}</span>${costHTML(c)}</button>`;
+    return `<button class="card" data-act="repair" data-type="${b}" data-ruin="${o.a}" ${canAfford(c) ? '' : 'disabled'}><img src="${BICON[b]}" alt=""><span class="nm">${d.name}</span><span class="fx">${d.desc}</span>${costHTML(c)}${PERK[b] ? `<span class="pk">${PERK[b]}</span>` : ''}</button>`;
   }).join('') + `</div>`;
   return h;
 }
@@ -4689,7 +4717,7 @@ function tileHTML(i) {
         if (d.unique && count(b) >= 1) return '';
         const c = buildCost(b), [bw, bh] = sizeAt(b, 1), fit = findAnchor(i, bw * 2, bh * 2) >= 0;
         const who = isHouse(b) ? `${3}人まで住める` : d.deco ? `${d.deco.race ? RACES[d.deco.race] + 'だけ' : '全種族'}満足度+${d.deco.v}` : d.w ? `${racesText(b)}が${d.w}人で働く` : '';
-        return `<button class="card" data-act="build" data-type="${b}" ${canAfford(c) && fit ? '' : 'disabled'}><img src="${BICON[b]}" alt=""><span class="nm">${d.name}</span><span class="fx">${bw}×${bh}マス${who ? '・' + who : ''}${fit ? '' : '・ここには入らない'}</span>${costHTML(c)}</button>`;
+        return `<button class="card" data-act="build" data-type="${b}" ${canAfford(c) && fit ? '' : 'disabled'}><img src="${BICON[b]}" alt=""><span class="nm">${d.name}</span><span class="fx">${bw}×${bh}マス${who ? '・' + who : ''}${fit ? '' : '・ここには入らない'}</span>${costHTML(c)}${PERK[b] ? `<span class="pk">${PERK[b]}</span>` : ''}</button>`;
       }).join('');
       if (cards) h += `<h3>${cat}</h3><div class="build">${cards}</div>`;
     });
