@@ -1603,7 +1603,8 @@ function arrive(live, via, want) {
   }
   const edges = []; for (let i = 0; i < N; i++) if (isEdge(i)) edges.push(i);
   const r = makeResident(S, race, edges.length ? t2h(edges[Math.floor(Math.random() * edges.length)]) : S.plaza);
-  r.sat = 55;
+  r.sat = 55; r.since = S.day;
+  { const ad = S.residents.filter(q => !q.child); if (ad.length) r.fFood = Math.max(r.fFood, ad.reduce((a, q) => a + q.fFood, 0) / ad.length); }   // ごはんの具合は村のみんなと同じくらいから
   S.residents.push(r);
   S.st.arr++;
   if (live) {
@@ -4508,8 +4509,10 @@ function autoJobs() {
 }
 function stageHTML() {
   const stg = lifeStage(), ad = S.residents.filter(r => !r.child), nst = NEEDS.filter(n => n.st > stg).reduce((m, n) => Math.min(m, n.st), 99), nx = NEEDS.filter(n => n.st === nst);
-  const rows = needsNow().map(n => { let c = 0; ad.forEach(r => { try { if (n.ok(r)) c++; } catch (e) {} }); const all = c >= ad.length;
-    return `<div class="need ${all ? 'ok' : ''}"><span>${all ? '✓' : '・'} ${n.name}</span><span class="nc">${c}/${ad.length}人</span>${all ? '' : `<span class="nh">${n.how}</span>`}</div>`; }).join('');
+  const rows = needsNow().map(n => { const miss = ad.filter(r => { try { return !n.ok(r); } catch (e) { return false; } }), c = ad.length - miss.length, all = !miss.length;
+    // 満たされていない人が少ないときは、だれかを出す（来たばかりの人なら、もうすぐ満たされる）
+    const who = miss.length && miss.length <= 3 ? `<span class="nh" style="color:var(--ink-dim)">まだの人：${miss.map(r => r.name + (S.day - (r.since || -99) <= 2 ? '（来たばかり）' : '')).join('・')}</span>` : '';
+    return `<div class="need ${all ? 'ok' : ''}"><span>${all ? '✓' : '・'} ${n.name}</span><span class="nc">${c}/${ad.length}人</span>${all ? '' : `<span class="nh">${n.how}</span>`}${who}</div>`; }).join('');
   return `<h3>暮らしの段階 ${stg}：${STAGE[stg].name}（${STAGE[stg].range}）</h3><p class="fxn">人が増えると、みんなの望みも増える。満たすほど満足度が上がる。</p>
     <div class="needs">${rows}</div>${nx.length ? `<p class="fxn">${STAGE[nst].name}（${STAGE[nst].range}）で増える望み：${nx.map(n => n.name).join('・')}</p>` : ''}`;
 }
