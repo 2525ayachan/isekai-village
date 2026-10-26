@@ -412,7 +412,7 @@ details.help summary { cursor: pointer; } details.help ul { margin: 6px 0 0; pad
   <div class="stage">
     <div class="mapbox" id="mapbox">
       <canvas id="map" aria-label="村の地図。指でつまんで拡大縮小、ドラッグで移動、タップで選ぶ"></canvas>
-      <div class="banner" id="banner" hidden>道モード：なぞると道を引けます（1マス3ゴールド）。道をタップすると撤去。地図を動かすときは2本指で</div>
+      <div class="banner" id="banner" hidden>道モード：なぞると道を引けます。道をタップすると撤去。地図を動かすときは2本指で</div>
       <div class="mapctl">
         <button id="zin" aria-label="拡大">＋</button>
         <button id="zout" aria-label="縮小">－</button>
@@ -452,7 +452,6 @@ const REC_KEY = 'isekai-records';
 const BASE_SPEED = 1;              // ×1で1日約10分
 const SAVE_KEY = 'isekai-town-v4';
 const OFFLINE_CAP = 8 * 3600;
-const ROAD_COST = 3;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const NB = Array.from({ length: N }, (_, i) => {
   const r = Math.floor(i / W), c = i % W, o = [];
@@ -3118,8 +3117,7 @@ document.getElementById('roadbtn').onclick = () => {
 const canRoad = i => S.open[i] && OCC[i] < 0 && !S.road[i] && !ruinAt(i);
 function placeRoad(i) {
   if (!canRoad(i)) return false;
-  if (S.gold < ROAD_COST) { toast('ゴールドが足りません'); return false; }
-  S.gold -= ROAD_COST; S.road[i] = true; S.flags.road = 1; terrDirty = true; return true;
+  S.road[i] = true; S.flags.road = 1; terrDirty = true; return true;   // 道はお金がかからない
 }
 function paintAt(sx, sy, gs) {
   const i = tileOf(cam.x + sx / cam.z, cam.y + sy / cam.z);
@@ -3134,7 +3132,7 @@ function setBanner() {
   if (layoutMode) { bn.textContent = '配置換え：建物をタップして選び、動かしたい場所をタップ'; bn.hidden = false; }
   else if (moveMode) { bn.textContent = '引っ越しモード：新しい場所をタップ'; bn.hidden = false; }
   else if (pickMode) { bn.textContent = '開拓する森をタップして選ぶ'; bn.hidden = false; }
-  else if (roadMode) { bn.textContent = '道モード：なぞって道を引く（1マス3G）・道をタップで撤去・2本指で地図移動'; bn.hidden = false; }
+  else if (roadMode) { bn.textContent = '道モード：なぞって道を引く・道をタップで撤去・2本指で地図移動'; bn.hidden = false; }
   else bn.hidden = true;
   if (S) renderMission();
 }
@@ -3167,8 +3165,10 @@ function tapAt(sx, sy) {
     return;
   }
   if (pickMode) {
-    if (S.open[i] || ruinAt(i) || queued(i)) { toast('まだ開拓していない森を選ぼう'); return; }
-    const k = pickMode.indexOf(i); if (k >= 0) pickMode.splice(k, 1); else pickMode.push(i);
+    const k = pickMode.indexOf(i);
+    if (k >= 0) { pickMode.splice(k, 1); prunePick(); }
+    else if (pickable(i)) pickMode.push(i);
+    else { toast(S.open[i] || ruinAt(i) ? '森を選ぼう' : queued(i) ? 'その森はもう開拓を頼んであるよ' : '選んだ森のとなりから選ぼう'); return; }
     lastHTML = ''; renderPanel(true); return;
   }
   if (roadMode) {
@@ -3181,7 +3181,7 @@ function tapAt(sx, sy) {
   const gst = guideStep() || mgStep();
   if (gst && gst.noTap) return;
   if (gst && gst.onlyRuin) { const o = ruinAt(i); if (!o || (o.b || o.tag) !== gst.onlyRuin) return; sel = { type:'tile', i:hc }; lastHTML = ''; renderPanel(true); return; }
-  if (gst && gst.onlyForest) { if (S.open[i] || ruinAt(i) || !NB[i].some(v => S.open[v])) return; sel = { type:'tile', i:hc }; lastHTML = ''; renderPanel(true); return; }
+  if (gst && gst.onlyForest) { if (S.open[i] || ruinAt(i) || !NB[i].some(v => S.open[v])) return; if (count('lodge') && !queued(i)) { startPick(i); return; } sel = { type:'tile', i:hc }; lastHTML = ''; renderPanel(true); return; }
   if (gst && gst.onlyEmpty) { if (OCCH[hc] >= 0 || !S.open[i] || ruinAt(i) || S.road[i]) return; sel = { type:'tile', i:hc }; lastHTML = ''; renderPanel(true); return; }
   if (gst && gst.onlyB) {
     const a = OCCH[hc];
@@ -3201,6 +3201,7 @@ function tapAt(sx, sy) {
   if (gst && gst.onlyRes && (!hit || hit.id !== gst.onlyRes())) return;
   if (hit && hit.offer) acceptRequest(hit);
   if (hit) { sel = { type:'res', id:hit.id }; if (!hit.hero) S.flags.talk = 1; liftFor(sy); }
+  else if (!gst && OCCH[hc] < 0 && !S.open[i] && !ruinAt(i) && !queued(i) && NB[i].some(v => S.open[v]) && count('lodge')) { startPick(i); return; }
   else { const a = OCCH[hc] >= 0 ? OCCH[hc] : hc; sel = sel && sel.type === 'tile' && (sel.i === a || (OCCH[hc] < 0 && !S.tiles[sel.i] && h2t(sel.i) === i)) ? null : { type:'tile', i:a }; if (sel) liftFor(sy); }
   lastHTML = ''; renderPanel(true);
 }
@@ -3308,6 +3309,11 @@ function draw(dt) {
   }
   while (bi < blds.length) { drawB(blds[bi][2], blds[bi][1], false); bi++; }
   (pickMode || []).forEach(j => { const x = (j % W) * T, y = Math.floor(j / W) * T; p(x + 1, y + 1, 14, 1, C.yel); p(x + 1, y + 14, 14, 1, C.yel); p(x + 1, y + 1, 1, 14, C.yel); p(x + 14, y + 1, 1, 14, C.yel); });
+  if (pickMode) { g.globalAlpha = .75 + .25 * Math.sin(NOW / 250); pickCands().forEach(j => { const x = (j % W) * T, y = Math.floor(j / W) * T, c = '#fff6c0';
+    for (let k = 2; k < 14; k += 4) { p(x + k, y + 1, 2, 1, c); p(x + k, y + 14, 2, 1, c); p(x + 1, y + k, 1, 2, c); p(x + 14, y + k, 1, 2, c); }
+    p(x + 6, y + 4, 4, 8, OUTLINE); p(x + 4, y + 6, 8, 4, OUTLINE); p(x + 7, y + 5, 2, 6, c); p(x + 5, y + 7, 6, 2, c); }); g.globalAlpha = 1; }
+  { const gs = guideStep(); if (gs && gs.spotBox && layoutMode && sel && sel.type === 'tile' && S.tiles[sel.i]) { const a = layoutSpot(); if (a != null) { const [w, h] = hsOf(S.tiles[sel.i]), x = (a % HW) * 8, y = Math.floor(a / HW) * 8, ww = w * 8, hh = h * 8; g.globalAlpha = .6 + .3 * Math.sin(NOW / 220); for (let k = 0; k < ww; k += 4) { p(x + k, y, 2, 1, C.white); p(x + k, y + hh - 1, 2, 1, C.white); } for (let k = 0; k < hh; k += 4) { p(x, y + k, 1, 2, C.white); p(x + ww - 1, y + k, 1, 2, C.white); } g.globalAlpha = 1; } } }
+  { const gs = guideStep(); if (gs && gs.ghost && roadMode) { g.globalAlpha = .45 + .25 * Math.sin(NOW / 200); gs.ghost().forEach(j => { const x = (j % W) * T, y = Math.floor(j / W) * T; p(x + 4, y + 4, 8, 8, C.path); p(x, y + 4, 4, 8, C.path); p(x + 12, y + 4, 4, 8, C.path); }); g.globalAlpha = 1; } }
   (S.clear || []).forEach(q => (q.batch || []).forEach(j => { const x = (j % W) * T, y = Math.floor(j / W) * T; g.globalAlpha = .8; p(x + 1, y + 1, 4, 1, C.yel); p(x + 1, y + 1, 1, 4, C.yel); p(x + 11, y + 14, 4, 1, C.yel); p(x + 14, y + 11, 1, 4, C.yel); g.globalAlpha = 1; }));
   (S.clear || []).forEach(q => {
     const x = (q.i % W) * T, y = Math.floor(q.i / W) * T;
@@ -3781,8 +3787,9 @@ const MISSIONS = [
       ...(alt !== 'ready' ? [staffStep('lodge', '開拓小屋')] : []),
       { t:'矢印の森（黄色い＋の印）をタップしよう', target:'#map', onlyForest:true,
         mapTarget:() => { const f = frontier(); return f != null ? [(f % W) * T + 8, Math.floor(f / W) * T - 1] : null; },
-        done:() => sel && sel.type === 'tile' && !S.open[h2t(sel.i)] && !ruinAt(h2t(sel.i)) && NB[h2t(sel.i)].some(v => S.open[v]) },
-      { t:'「このマスの開拓を頼む」を押そう。開拓者が昼のあいだに切り開くよ', target:'#panel [data-act="land"]', done:() => (S.clear || []).length > 0 || S.land >= 1 },
+        done:() => (pickMode && pickMode.length > 0) || (S.clear || []).length > 0 || S.land >= 1 },
+      { t:'光る「＋」の森もタップすると、いっしょに開拓できる（5マスまで無料）。決めたら「開拓を開始する」', target:'.stage', bubTop:true,
+        view:() => pickMode && pickMode.length ? center(pickMode[0]) : null, done:() => (S.clear || []).length > 0 || S.land >= 1 },
     ], done:() => S.land >= 1 },
   { id:'bakery', name:'崩れた宿屋をパン屋にしよう', gold:40, who:1,
     say:'崩れた宿屋は、パン屋に建て直せるよ。パン屋ができたら、パン職人が来てくれるかも！',
@@ -3951,9 +3958,30 @@ function tutNewcomer() {
 }
 const gordon = () => S.residents.find(r => r.id === (S.founders || [])[0]);
 const fieldAnchor = () => S.tiles.findIndex(t => t && t.b === 'field');
+// チュートリアルで道を伸ばす起点：畑の上の道（なければ広場に近い道）
+const tutRoad = () => { const f = fieldAnchor(); if (f >= 0) { const up = h2t(f) - W; if (S.road[up]) return up; } const pc = h2t(S.plaza); let b = null, bd = 1e9; S.road.forEach((v, j) => { if (!v) return; const d = Math.abs(j % W - pc % W) + Math.abs(Math.floor(j / W) - Math.floor(pc / W)); if (d < bd) { bd = d; b = j; } }); return b; };
 const innRuin = () => (S.ruins || []).find(o => o.tut);
 const innAnchor = () => S.tutHouse != null && S.tiles[S.tutHouse] ? S.tutHouse : -1;
 const whAnchor = () => S.tiles.findIndex(t => t && t.b === 'warehouse');
+// 配置換えの練習で、動かす先のおすすめ（選んだ建物が入る、広場に近い空き地。2マス以上はなれた所）
+let lspot = { key:'', a:null };
+function layoutSpot() {
+  if (!sel || sel.type !== 'tile' || !S.tiles[sel.i]) return null;
+  const from = sel.i, key = from + ':' + S.tiles.filter(Boolean).length;
+  if (lspot.key === key) return lspot.a;
+  const t = S.tiles[from], [w, h] = hsOf(t), fc = from % HW, fr = Math.floor(from / HW), pc = S.plaza % HW, pr = Math.floor(S.plaza / HW);
+  let best = null, bd = 1e9;
+  for (let r = 0; r + h <= HH; r += 2) for (let c = 0; c + w <= HW; c += 2) {
+    if (Math.abs(c - fc) + Math.abs(r - fr) < 4) continue;
+    const a = r * HW + c; if (!fits(a, w, h, from)) continue;
+    let ok = true; for (let dy = 0; dy < h && ok; dy++) for (let dx = 0; dx < w && ok; dx++) { const j = h2t(a + dy * HW + dx); if (!S.open[j] || S.road[j] || ruinAt(j)) ok = false; }
+    if (!ok) continue;
+    const d = Math.abs(c - pc) + Math.abs(r - pr) + Math.abs(c - fc) * .5 + Math.abs(r - fr) * .5;
+    if (d < bd) { bd = d; best = a; }
+  }
+  lspot = { key, a:best }; return best;
+}
+const layoutSpotXY = a => { const t = S.tiles[sel.i], [w, h] = hsOf(t); return [(a % HW) * 8 + w * 4, Math.floor(a / HW) * 8 + h * 4]; };
 const GUIDE = [
   { t:'地図を指でドラッグして、動かしてみよう', target:'#map', noTap:true, done:() => S.flags.pan },
   { t:'＋を押すと拡大できる（2本指でつまんでもOK）', target:'#zin', done:() => S.flags.zin },
@@ -3990,14 +4018,19 @@ const TALK = [
     done:() => hasWorker('warehouse') || !porterCand() },
   { guide:true, t:'品物の数と倉庫の空き、配達係がここで分かる。×で閉じよう', target:'#panel .sheetx button', done:() => !sel },
   { who:0, t:'次は道じゃ。道ぞいの建物は仕事が25%早くなる。家の前に道があると満足度が上がり、人の歩みも速くなるぞ。', next:true },
-  { who:1, t:'でも道は1マス3ゴールドかかるし、道の上には建物を建てられないよ。引く場所はよく考えてね。', next:true },
+  { who:1, t:'道はお金がかからないけど、道の上には建物を建てられないよ。引く場所はよく考えてね。', next:true, enter:() => { const r = tutRoad(); if (r != null) focusTut(center(r)); } },
   { guide:true, t:'左下の「道を引く」を押そう', target:'#roadbtn', done:() => roadMode },
-  { guide:true, t:'地図を指でなぞって、道を引いてみよう（1マス3ゴールド）', target:'#map', done:() => S.flags.road },
+  { guide:true, t:'▼の道から右へ、指でなぞって道を伸ばしてみよう', target:'#map', mapTarget:() => { const r = tutRoad(); if (r == null) return null; const [x, y] = center(r); return [x, y + 2]; },
+    ghost:() => { const r = tutRoad(); if (r == null) return []; const out = []; for (let k = 1; k <= 3; k++) { const j = r + k; if (j % W === 0 || !canRoad(j)) break; out.push(j); } return out; },
+    done:() => S.flags.road },
   { guide:true, t:'「道モードを終える」を押そう', target:'#roadbtn', done:() => !roadMode, gold:30, wood:20 },
   { who:1, t:'建物の場所は、あとからいつでも動かせるよ。お金もかからないんだ。', next:true },
   { guide:true, t:'「配置換え」を押そう', target:'#layoutbtn', done:() => layoutMode },
-  { guide:true, t:'動かしたい建物をタップしよう', target:'#map', done:() => layoutMode && sel && sel.type === 'tile' && S.tiles[sel.i] && S.tiles[sel.i].b !== 'plaza' },
-  { guide:true, t:'地図の、動かしたい場所をタップしよう（矢印で細かく動かすこともできる）', target:'#map', done:() => S.flags.moved },
+  { guide:true, t:'▼の倉庫をタップしよう（どの建物でも動かせるよ）', target:'#map',
+    mapTarget:() => { const w = whAnchor(); if (w < 0) return null; const [x, y] = bcenter(w); return [x, y - 1]; },
+    done:() => layoutMode && sel && sel.type === 'tile' && S.tiles[sel.i] && S.tiles[sel.i].b !== 'plaza' },
+  { guide:true, t:'▼の空き地をタップすると、そこへ動くよ（シートの矢印で細かく動かすこともできる）', target:'#map',
+    mapTarget:() => { const a = layoutSpot(); if (a == null) return null; const [x, y] = layoutSpotXY(a); return [x, y + 4]; }, spotBox:true, done:() => S.flags.moved },
   { guide:true, t:'「終える」を押そう', target:'#panel [data-act="layout-done"]', done:() => !layoutMode },
   { who:0, t:'村のようすや困りごとは、下の「村」で分かるぞ。押してみるのじゃ。', hint:'下の「村」を押す', unlock:'village', done:() => tab === 'village' },
   { who:0, t:'仕事のない人や、食べ物が足りないときは、ここに出るのじゃ。', next:true },
@@ -4062,7 +4095,8 @@ function placeGuide(rect, step, hold) {
   bub.hidden = false;
   const bh = bub.offsetHeight || 90;
   let top;
-  if (step.mapTarget) top = $('talk').parentElement.getBoundingClientRect().bottom - 76 - bh;   // 会話の箱と同じ高さ
+  if (step.bubTop) top = $('talk').parentElement.getBoundingClientRect().top + 8;   // 地図のいちばん上
+  else if (step.mapTarget) top = $('talk').parentElement.getBoundingClientRect().bottom - 76 - bh;   // 会話の箱と同じ高さ
   else if ((r.bottom - r.top) > vhH * .4) top = r.top + 60;
   else if (r.top > vhH * .5) top = Math.max(8, r.top - bh - 48);
   else top = Math.min(vhH - bh - 8, r.bottom + 44);
@@ -4082,6 +4116,7 @@ function renderGuide(force) {
         const pt = gs.mapTarget();
         if (pt) { lastFocus = key; focusTut(pt); }
       }
+      if (gs.view && lastFocus !== key) { const pt = gs.view(); if (pt) { lastFocus = key; focusTut(pt, .5); } }
       if (key !== lastGuideKey || force) {
         const head = inMg ? `<span class="gs">ミッション：${curList()[S.mg.m].name}（${S.mg.i + 1}/${stepsOf(curList()[S.mg.m]).length}）</span>` : S.guide.i < GUIDE.length ? `<span class="gs">はじめての操作 ${S.guide.i + 1}/${GUIDE.length}</span>` : '';
         $('gbub').innerHTML = `${head}<span class="gt">${gs.t}</span>
@@ -4582,13 +4617,9 @@ function tileHTML(i) {
           `<div class="row"><button class="btn sub danger" data-act="land-cancel" data-own="${owner.i}">この開拓をやめる（費用は戻りません）</button></div>`;
       }
       if (!lodge) return head + `<div class="warn soft">開拓小屋を建てて開拓者を決めると、森の開拓を頼めるよ（空き地の「採集」から）</div>`;
-      const c = landCost(), ok = canAfford(c);
-      const multi = [3, 6].map(n => { const bt = landBatch(ti, n); if (bt.length < n) return ''; const bc = batchCost(n);
-        return `<button class="btn sub" data-act="land" data-n="${n}" ${canAfford(bc) ? '' : 'disabled'}><span>まわりもまとめて${n}マス頼む</span>${costHTML(bc)}</button>`; }).join('');
       return head + `<p>開拓者が昼のあいだに切り開く（1人で約${CLEAR_HOURS}時間/マス）。いま開拓者${crew.length}人・順番待ち${queueLeft()}マス</p>
         ${crew.length ? '' : `<div class="warn soft">開拓小屋に開拓者がいません。頼んでも始まらないよ</div>`}
-        <button class="btn" data-act="land" ${ok ? '' : 'disabled'}><span>このマスの開拓を頼む</span>${costHTML(c)}</button>
-        <button class="btn sub" data-act="pick-start"><span>地図でマスを選んで、まとめて頼む</span></button>${multi}`;
+        <button class="btn" data-act="pick-start"><span>このマスから開拓するマスを選ぶ</span></button>`;
     }
     return `<h2>深い魔の森</h2><p>となりから開拓しよう。</p>`;
   }
@@ -4800,11 +4831,27 @@ function layoutHTML() {
     `<div class="row">${d.fixed || t.b === 'plaza' ? '' : `<button class="btn sub danger" data-act="demolish">${armed === 'd' + i ? 'もう一度押すと取り壊す' : '取り壊す'}</button>`}<button class="btn" data-act="layout-done" style="justify-content:center"><span>終える</span></button></div>`;
 }
 let pickMode = null;   // 開拓したい森を地図で選ぶ
+const PICK_FREE = 5, PICK_MANA = 3;   // 1回の開拓で5マスまで無料。それより多いと1マスにつきマナ3
+// 選べる森：切り開いた土地か、選んだマスのとなり
+const pickable = j => !S.open[j] && !ruinAt(j) && !queued(j) && !(pickMode || []).includes(j) && NB[j].some(v => S.open[v] || (pickMode || []).includes(v));
+// おすすめ：選んだマスのとなり（村のはしの森なら、どこでも選べる）
+const pickCands = () => { const out = []; if (!pickMode) return out; for (let j = 0; j < N; j++) if (pickable(j) && NB[j].some(v => pickMode.includes(v))) out.push(j); return out; };
+function pickCost(n) { const c = batchCost(n); if (n > PICK_FREE) c.mana = (c.mana || 0) + (n - PICK_FREE) * PICK_MANA; return c; }
+// 外したマスのせいで、つながらなくなったマスも外す
+function prunePick() {
+  const keep = new Set(), q = [];
+  pickMode.forEach(j => { if (NB[j].some(v => S.open[v])) { keep.add(j); q.push(j); } });
+  while (q.length) { const u = q.shift(); NB[u].forEach(v => { if (pickMode.includes(v) && !keep.has(v)) { keep.add(v); q.push(v); } }); }
+  pickMode = pickMode.filter(j => keep.has(j));
+}
+function startPick(ti) { pickMode = [ti]; sel = null; setBanner(); lastHTML = ''; renderPanel(true); }
 function pickHTML() {
-  const n = pickMode.length;
-  return `<h2>開拓する森を選ぶ</h2><p>地図の森をタップして選ぶ（もう一度タップで外す）。となりが切り開かれたマスから順に、開拓者が切り開く。</p>
-    <div class="ok">選んだ森：${n}マス（無料）</div>
-    <div class="row"><button class="btn sub" data-act="pick-cancel">やめる</button><button class="btn" data-act="pick-ok" ${n ? '' : 'disabled'}><span>${n}マスの開拓を頼む</span></button></div>`;
+  const n = pickMode.length, c = pickCost(n), ok = n > 0 && canAfford(c), crew = lodgeCrew().length;
+  return `<h2>開拓する森を選ぶ</h2><p>光っている「＋」の森（村のはしの森ならどこでも）をタップすると、いっしょに開拓できる（もう一度タップで外す）。1回で${PICK_FREE}マスまで無料、それより多いと1マスにつきマナ${PICK_MANA}。</p>
+    <div class="ok">選んだ森：${n}マス ${costHTML(c)}</div>
+    ${n && !ok ? `<div class="warn soft">マナが足りない。${PICK_FREE}マスまでなら無料で頼めるよ</div>` : ''}
+    ${crew ? '' : '<div class="warn soft">開拓小屋に開拓者がいません。頼んでも始まらないよ</div>'}
+    <div class="row"><button class="btn sub" data-act="pick-cancel">やめる</button><button class="btn" data-act="pick-ok" ${ok ? '' : 'disabled'}><span>開拓を開始する</span></button></div>`;
 }
 function panelHTML() {
   if (pickMode) return pickHTML();
@@ -5018,9 +5065,13 @@ $('panel').addEventListener('click', e => {
   } else if (act === 'lsub') { layoutSub = layoutSub === b.dataset.v ? null : b.dataset.v;
   } else if (act === 'move-cancel') { moveMode = null; setBanner(); }
   else if (act === 'order') deliverOrder();
-  else if (act === 'pick-start') { pickMode = i != null && !S.open[h2t(i)] ? [h2t(i)] : []; sel = null; setBanner(); }
+  else if (act === 'pick-start') { pickMode = i != null && !S.open[h2t(i)] && !queued(h2t(i)) ? [h2t(i)] : []; sel = null; setBanner(); }
   else if (act === 'pick-cancel') { pickMode = null; setBanner(); }
-  else if (act === 'pick-ok') { S.clear = S.clear || []; pickMode.forEach(j => { if (!queued(j) && !S.open[j]) S.clear.push({ i:j, prog:0 }); }); toast(`開拓を頼んだ（${pickMode.length}マス）`); pickMode = null; setBanner(); }
+  else if (act === 'pick-ok') {
+    const c = pickCost(pickMode.length); if (!pickMode.length || !canAfford(c)) return;
+    pay(c); S.clear = S.clear || []; pickMode.forEach(j => { if (!queued(j) && !S.open[j]) S.clear.push({ i:j, prog:0 }); });
+    toast(`開拓を頼んだ（${pickMode.length}マス）。開拓者が昼に切り開くよ`); pickMode = null; setBanner();
+  }
   else if (act === 'dis-pick') { disK = disK === b.dataset.k ? null : b.dataset.k; disN = Math.min(10, Math.floor(S.inv[b.dataset.k] || 0)); }
   else if (act === 'dis-n') { const mx = Math.floor(S.inv[disK] || 0); disN = b.dataset.d === 'all' ? mx : clamp(disN + +b.dataset.d, 1, mx); }
   else if (act === 'dis-do') { const n = Math.min(disN, Math.floor(S.inv[disK] || 0)); if (n > 0) { S.inv[disK] -= n; used(disK, n); toast(`${ITEMS[disK].name}を${n}個捨てた`); } if ((S.inv[disK] || 0) < 1) disK = null; }
@@ -5058,9 +5109,9 @@ function findRes(id) {
   liftFor(vh / 2);
 }
 // 下から出るシートに隠れないよう、画面のy=syにあるものを上の方へ寄せる
-function focusTut(pt) {   // チュートリアル中は、目標が地図の上のほう（シートや会話に隠れない所）に来るように固定
+function focusTut(pt, fy = .3) {   // チュートリアル中は、目標が地図の上のほう（シートや会話に隠れない所）に来るように固定
   cam.z = clamp(Math.max(cam.z, vw / (7 * T)), zMin(), 12);
-  cam.x = pt[0] - vw / cam.z / 2; cam.y = pt[1] - vh * .3 / cam.z;
+  cam.x = pt[0] - vw / cam.z / 2; cam.y = pt[1] - vh * fy / cam.z;
   const w = vw / cam.z, h = vh / cam.z;
   cam.x = w >= WW ? (WW - w) / 2 : clamp(cam.x, -w * .3, WW - w * .7);
   cam.y = h >= WH ? (WH - h) / 2 : clamp(cam.y, -h * .5, WH - h * .35);
