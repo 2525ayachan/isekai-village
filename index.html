@@ -374,7 +374,11 @@ details.help summary { cursor: pointer; } details.help ul { margin: 6px 0 0; pad
 .story .pic img { image-rendering: pixelated; height: 80px; }
 .story .pic img.f { height: 74px; }
 .story p { color: var(--ink); line-height: 1.75; font-size: 1.08rem; }
-.modal .box.story { max-width: 460px; padding: 22px; gap: 16px; }
+.modal .box.story { max-width: 460px; padding: 22px; gap: 16px; height: min(560px, calc(100dvh - 90px)); }
+.story .stx { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.story h3.ph { visibility: hidden; }
+.story .sbtns .ph { visibility: hidden; }
+.story .pic { height: 110px; flex: none; }
 .modal .box.story h3 { font-size: 1.45rem; }
 .story .who { font-size: .95rem; }
 .story .sbtns .btn { padding: 14px; font-size: 1.1rem; }
@@ -3661,18 +3665,17 @@ let FOREST_ICON = '';
 function showStory(k) {
   const pages = storyPages(), pg = pages[k], last = k === pages.length - 1;
   $('modalBox').className = 'box win story'; $('modal').onclick = null; $('modal').classList.add('dark');
-  $('modalBox').innerHTML = `${k === 0 ? '<h3>プロローグ　忘れられた村</h3>' : ''}
-    <div class="pic">${pg.pic}</div><p>${pg.text}</p>
+  $('modalBox').innerHTML = `<h3${k === 0 ? '' : ' class="ph" aria-hidden="true"'}>プロローグ　忘れられた村</h3>
+    <div class="pic">${pg.pic}</div><div class="stx"><p>${pg.text}</p></div>
     <div class="pg">${k + 1} / ${pages.length}</div>
-    <div class="sbtns">${k > 0 ? '<button class="btn sub" id="st-back">もどる</button>' : ''}<button class="btn" id="st-next"><span>${last ? '開拓をはじめる' : 'つぎへ'}</span></button></div>
-`;
+    <div class="sbtns"><button class="btn sub${k > 0 ? '' : ' ph'}" id="st-back"${k > 0 ? '' : ' tabindex="-1" aria-hidden="true"'}>もどる</button><button class="btn" id="st-next"><span>${last ? '開拓をはじめる' : 'つぎへ'}</span></button></div>`;
   $('modal').hidden = false;
   $('st-next').onclick = () => {
     if (!last) { showStory(k + 1); return; }
     $('modalBox').className = 'box win'; closeModal();
     if (!S.storySeen) { S.storySeen = true; S.tut.on = true; S.guide = { i:0, t:NOW }; save(); renderMission(); renderGuide(true); }
   };
-  if ($('st-back')) $('st-back').onclick = () => showStory(k - 1);
+  if (k > 0) $('st-back').onclick = () => showStory(k - 1);
   // 箱の下に、文字だけのリンク：物語を飛ばして開拓をはじめる
   let sk = $('st-skip');
   if (!sk) { sk = document.createElement('a'); sk.id = 'st-skip'; sk.href = '#'; sk.className = 'skiplink'; sk.textContent = 'ストーリーをスキップ'; $('modal').appendChild(sk); }
@@ -3743,7 +3746,8 @@ function skipOps() {
 }
 // スキップは2回押しで確定（うっかり防止）
 let skipArmed = 0;
-const armSkip = (el, label, go) => { el.onclick = e => { e.stopPropagation(); if (NOW - skipArmed < 3000) { skipArmed = 0; go(); return; } skipArmed = NOW; el.textContent = 'もう一度押すとスキップ'; setTimeout(() => { if (el.isConnected) el.textContent = label; }, 3000); }; };
+const armSkip = (el, label, go) => { const born = NOW; el.onclick = e => { e.stopPropagation(); if (NOW - born < 800) return;   // 出た直後のタップは、うっかりなので無視
+  if (NOW - skipArmed < 3000) { skipArmed = 0; go(); return; } skipArmed = NOW; el.textContent = 'もう一度押すとスキップ'; setTimeout(() => { if (el.isConnected) el.textContent = label; }, 3000); }; };
 // チュートリアルを飛ばす：「チュートリアル完了」と同じ状態にする
 function tutSkipAll() {
   S.storySeen = true; S.tut.on = true;
@@ -4005,7 +4009,7 @@ const GUIDE = [
   { t:'地図を指でドラッグして、動かしてみよう', target:'#map', noTap:true, done:() => S.flags.pan },
   { t:'＋を押すと拡大できる（2本指でつまんでもOK）', target:'#zin', done:() => S.flags.zin },
   { t:'⌂を押すと、いつでも広場にもどれる', target:'#zhome', done:() => S.flags.home },
-  { t:'矢印の先のゴードンをタップしてみよう', target:'#map', mapTarget:() => { const g = gordon(), a = g && agents.get(g.id); return a && !a.hidden ? [a.x, a.y - 9] : null; },
+  { t:'矢印の先のゴードンをタップしてみよう', target:'#map', focus:true, mapTarget:() => { const g = gordon(), a = g && agents.get(g.id); return a && !a.hidden ? [a.x, a.y - 9] : null; },
     onlyRes:() => (gordon() || {}).id, done:() => sel && sel.type === 'res' && sel.id === (gordon() || {}).id },
   { t:'建物や人をタップすると、ここに詳しく出る。×で閉じよう', target:'#panel .sheetx button', done:() => !sel },
   { t:`上には村の持ち物が出る。<span class="glist"><span><img src="${ICON.gold}" alt="">ゴールド：建てる・直す・人を呼ぶのに使う</span><span><img src="${ICON.wood}" alt=""><img src="${ICON.stone}" alt="">木材・石材：建物の材料</span><span><img src="${ICON.mana}" alt="">マナ：魔法の建物や、森の奥の開拓に使う</span><span><img src="${ICON.pop}" alt="">住人：いる人数／住める人数と、みんなの満足度</span></span>`, target:'#res', ok:true },
@@ -4015,14 +4019,15 @@ const GUIDE = [
   { t:'「とじる」で閉じよう', target:'#s-close', done:() => !modalOpen() },
 ];
 const TALK = [
-  { who:0, t:'さて旅人さん、まずはあの崩れた家を直してくれんか。タップすれば直せるはずじゃ。', hint:'▼の建物をタップ→修理',
+  { who:0, t:'さて旅人さん、まずはあの崩れた家を直してくれんか。タップすれば直せるはずじゃ。', hint:'▼の建物をタップ',
     mapTarget:() => { const o = innRuin(); return o ? [(o.a % W) * T + 8, Math.floor(o.a / W) * T - 1] : null; },
-    done:() => S.tutHouse != null },
+    done:() => S.tutHouse != null || (sel && sel.type === 'tile' && ruinAt(h2t(sel.i)) && ruinAt(h2t(sel.i)).tut) },
+  { guide:true, t:'「家を修理する」を押そう', target:'#panel [data-act="repair"]', done:() => S.tutHouse != null },
   { guide:true, delay:1700, t:'家が直った！これで旅の人が住めるようになる。<br><small>ごほうび +30ゴールド</small>', target:'#map', ok:'つぎへ', gold:30,
     mapTarget:() => { const i = innAnchor(); if (i < 0) return null; const [x, y] = bcenter(i); return [x, y - 12]; } },
-  { guide:true, t:'直った家をタップしてみよう', target:'#map', onlyB:() => innAnchor(),
+  { guide:true, t:'直った家をタップしてみよう', target:'#map', onlyB:() => innAnchor(), noUp:true,
     mapTarget:() => { const i = innAnchor(); if (i < 0) return null; const [x, y] = bcenter(i); return [x, y - 12]; }, done:() => sel && sel.type === 'tile' && sel.i === innAnchor() },
-  { guide:true, t:'住める人数や、住んでいる人がここで分かる。×で閉じよう', target:'#panel .sheetx button', done:() => !sel },
+  { guide:true, t:'住める人数や、住んでいる人がここで分かる。×で閉じよう', target:'#panel .sheetx button', noUp:true, done:() => !sel },
   { who:1, t:'わあ、元どおり！これで旅の人が住めるね。', next:true },
   { who:1, t:'あれ？だれか来たみたい！', scene:'settler', enter:tutNewcomer, done:() => (S.seenScene || {}).settler && !scene },
   { who:1, unlock:'people', t:'来た人のようすは、下の「住人」で見られるよ。仕事のない人や、困っている人を探したいときに押してね。', hint:'下の「住人」を押す', done:() => tab === 'people' },
@@ -4030,20 +4035,18 @@ const TALK = [
   { who:1, t:'次は畑だよ。畑をタップして、働き手を決めてみて。わたしでもいいよ！', hint:'▼の畑をタップ→働き手を選ぶ',
     mapTarget:() => { const f = fieldAnchor(); if (f < 0) return null; const [x, y] = bcenter(f); return [x, y - 6]; }, done:() => hasWorker('field'), gold:20 },
   { who:0, t:'仕事は一度決めると3日は変えられん。よく考えて割り振るのじゃ。', next:true },
-  { who:1, t:'とれた物は、配達係が倉庫に運ぶんだ。倉庫をタップしてみて。', hint:'▼の倉庫をタップ',
+  { who:1, t:'とれた物は、配達係が倉庫に運ぶんだ。倉庫をタップして、配達係を決めてみて。', hint:'▼の倉庫をタップ→働き手を選ぶ',
     mapTarget:() => { const w = whAnchor(); if (w < 0) return null; const [x, y] = bcenter(w); return [x, y - 12]; },
-    done:() => sel && sel.type === 'tile' && S.tiles[sel.i] && S.tiles[sel.i].b === 'warehouse' },
-  { guide:true, t:'配達係にする人を選ぼう（仕事のない人から）', target:'#panel details.more:has([data-act="setjob"])',
     done:() => hasWorker('warehouse') || !porterCand() },
   { guide:true, t:'品物の数と倉庫の空き、配達係がここで分かる。×で閉じよう', target:'#panel .sheetx button', done:() => !sel },
   { who:0, t:'次は道じゃ。道ぞいの建物は仕事が25%早くなる。家の前に道があると満足度が上がり、人の歩みも速くなるぞ。', next:true },
-  { who:1, t:'道はお金がかからないけど、道の上には建物を建てられないよ。引く場所はよく考えてね。', next:true, enter:() => { const r = tutRoad(); if (r != null) focusTut(center(r)); } },
+  { who:1, t:'でも道の上には建物を建てられないよ。引く場所はよく考えてね。', next:true, enter:() => { const r = tutRoad(); if (r != null) focusTut(center(r)); } },
   { guide:true, t:'左下の「道を引く」を押そう', target:'#roadbtn', done:() => roadMode },
   { guide:true, t:'▼の道から右へ、指でなぞって道を伸ばしてみよう', target:'#map', mapTarget:() => { const r = tutRoad(); if (r == null) return null; const [x, y] = center(r); return [x, y + 2]; },
     ghost:() => { const r = tutRoad(); if (r == null) return []; const out = []; for (let k = 1; k <= 3; k++) { const j = r + k; if (j % W === 0 || !canRoad(j)) break; out.push(j); } return out; },
     done:() => S.flags.road },
   { guide:true, t:'「道モードを終える」を押そう', target:'#roadbtn', done:() => !roadMode, gold:30, wood:20 },
-  { who:1, t:'建物の場所は、あとからいつでも動かせるよ。お金もかからないんだ。', next:true },
+  { who:1, t:'建物の場所は、あとからいつでも動かせるよ。', next:true },
   { guide:true, t:'「配置換え」を押そう', target:'#layoutbtn', done:() => layoutMode },
   { guide:true, t:'▼の倉庫をタップしよう（どの建物でも動かせるよ）', target:'#map',
     mapTarget:() => { const w = whAnchor(); if (w < 0) return null; const [x, y] = bcenter(w); return [x, y - 1]; },
@@ -4051,6 +4054,7 @@ const TALK = [
   { guide:true, t:'▼の空き地をタップすると、そこへ動くよ（シートの矢印で細かく動かすこともできる）', target:'#map',
     mapTarget:() => { const a = layoutSpot(); if (a == null) return null; const [x, y] = layoutSpotXY(a); return [x, y + 4]; }, spotBox:true, done:() => S.flags.moved },
   { guide:true, t:'「終える」を押そう', target:'#panel [data-act="layout-done"]', done:() => !layoutMode },
+  { who:1, t:'道を引くのも、建物を動かすのも、お金はかからないから安心してね。', next:true },
   { who:0, t:'村のようすや困りごとは、下の「村」で分かるぞ。押してみるのじゃ。', hint:'下の「村」を押す', unlock:'village', done:() => tab === 'village' },
   { who:0, t:'仕事のない人や、食べ物が足りないときは、ここに出るのじゃ。', next:true },
   { who:0, t:'この村では、作った物はみんなで分け合う。給料も買い物もないんじゃ。', next:true },
@@ -4131,7 +4135,7 @@ function renderGuide(force) {
     if (gs.delay && NOW - (S.guide.t || 0) < gs.delay) {   // 演出のあいだは待つ（操作はできない）
       placeGuide(null, gs, true); $('gbub').hidden = true; lastGuideKey = '';
     } else {
-      if (gs.mapTarget && (inMg || S.guide.i >= GUIDE.length) && lastFocus !== key) {
+      if (gs.mapTarget && (inMg || S.guide.i >= GUIDE.length || gs.focus) && lastFocus !== key) {
         const pt = gs.mapTarget();
         if (pt) { lastFocus = key; focusTut(pt); }
       }
@@ -4148,6 +4152,7 @@ function renderGuide(force) {
       }
       const el = document.querySelector(gs.target);
       placeGuide(el && el.offsetParent !== null ? el.getBoundingClientRect() : null, gs);
+      if (guideDoneAt) { [0, 1, 2, 3].forEach(k => { $('gb' + k).hidden = true; }); $('gspot').hidden = $('garrow').hidden = true; }   // できた（✓）あとは、光る枠を残さない
     }
   }
   const tk = $('talk');
@@ -4209,7 +4214,7 @@ function speakerOf(m) {
 }
 function renderMission() {
   const nb = $('nav-mission'), show = S.tut && S.tut.on && isUnlocked('mission');
-  nb.hidden = !show;
+  nb.hidden = !(S.tut && S.tut.on);   // 目標のボタンは最初から置く（使えるまではロック）
   if (!show && tab === 'mission') { tab = 'map'; lastHTML = ''; renderPanel(true); }
   $('dot-mission').hidden = !show || ((S.tut.goalDone || tutDone() || S.tut.seen === tutKey()) && !readyAny() && !S.tut.goalReady && !(S.reqs || []).some(q => q.ready && !q.got) && !(S.mer && S.mer.order && merHere()));
 }
@@ -4597,7 +4602,7 @@ function ruinHTML(o) {
   if (o.b && !(o.b === 'house' && !o.tut)) {
     const d = B[o.b], c = repairCost(o.b), lock = pop < d.unlock;
     return `<h2>${ruinName(o)}</h2><p>災害で崩れたまま。直せばまた使える。</p><div class="build">
-      <button class="card" data-act="repair" data-type="${o.b}" data-ruin="${o.a}" ${canAfford(c) && !lock ? '' : 'disabled'}><img src="${BICON[o.b]}" alt=""><span class="nm">${d.name}に修理する</span><span class="fx">${lock ? `住人${d.unlock}人で修理できる` : d.desc}</span>${costHTML(c)}</button></div>`;
+      <button class="card" data-act="repair" data-type="${o.b}" data-ruin="${o.a}" ${canAfford(c) && !lock ? '' : 'disabled'}><img src="${BICON[o.b]}" alt=""><span class="nm">${d.name}を修理する</span><span class="fx">${lock ? `住人${d.unlock}人で修理できる` : d.desc}</span>${costHTML(c)}</button></div>`;
   }
   let h = `<h2>${ruinName(o)}</h2><p>${o.w}×${o.h}マス。${o.b ? '家に直すか、' : ''}同じ大きさの建物に、半額で建て直せる。</p>`;
   if (!reach) return h + `<div class="warn soft">となりの森を開拓すると修理できる</div>`;
@@ -4736,7 +4741,8 @@ function tileHTML(i) {
     if (t.lv < MAX_LV) {
       const c = upCost(t.b, t.lv), [nw, nh] = sizeAt(t.b, t.lv + 1), grows = nw !== tw || nh !== th;
       const room = !grows || growAnchor(i, nw * 2, nh * 2) >= 0;
-      h += `<button class="btn" data-act="up" ${canAfford(c) && room ? '' : 'disabled'}><span>Lv${t.lv + 1}にする${isHouse(t.b) ? `（住人${3 * (t.lv + 1)}人）` : d.animal ? `（${2 * (t.lv + 1)}匹）` : d.w ? `（速さ×${t.lv + 1}・働き手はそのまま）` : ''}${grows ? `・${nw}×${nh}マスに` : ''}</span>${costHTML(c)}</button>`;
+      const tutNoUp = guideActive() && stepAt() && stepAt().noUp;
+      h += `<button class="btn" data-act="up" ${canAfford(c) && room && !tutNoUp ? '' : 'disabled'}><span>Lv${t.lv + 1}にする${isHouse(t.b) ? `（住人${3 * (t.lv + 1)}人）` : d.animal ? `（${2 * (t.lv + 1)}匹）` : d.w ? `（速さ×${t.lv + 1}・働き手はそのまま）` : ''}${grows ? `・${nw}×${nh}マスに` : ''}</span>${costHTML(c)}</button>`;
       if (grows && !room) h += `<div class="warn soft">広がる空きマスがありません</div>`;
     } else h += `<p>最大レベル</p>`;
   }
