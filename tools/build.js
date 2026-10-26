@@ -18,12 +18,13 @@ const head = `<!doctype html>
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>[hidden]{display:none!important} html,body{margin:0;padding:0}
 #pwa-up{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:99;display:flex;gap:8px;align-items:center;justify-content:space-between;background:#fffaf0;color:#3b2716;border:2px solid #a8703e;border-radius:8px;padding:8px 10px;font:14px/1.4 "DotGothic16",sans-serif;box-shadow:0 3px 0 rgba(90,58,34,.35)}
-#pwa-up button{font:inherit;border:0;border-radius:6px;padding:6px 12px;background:#a8703e;color:#fff;cursor:pointer}</style>
+#pwa-up small{display:block;font-size:11px;line-height:1.4;color:#7a5a3a;margin-top:2px}
+#pwa-up button{flex:none;font:inherit;border:0;border-radius:6px;padding:6px 12px;background:#a8703e;color:#fff;cursor:pointer}</style>
 </head>
 <body>
 `;
 const pwa = `
-<div id="pwa-up" hidden><span>新しい版があります</span><button type="button" id="pwa-go">更新する</button></div>
+<div id="pwa-up" hidden><span>新しい版があります<small>更新すると最初の画面に戻ります。「つづきから」を押せば、続きから遊べます。</small></span><button type="button" id="pwa-go">更新する</button></div>
 <script>
 // アプリ化：オフラインでも動き、新しい版が出たらお知らせする（セーブはそのまま）
 (function () {
