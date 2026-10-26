@@ -1243,7 +1243,7 @@ function growthHTML() {
   ];
   const ok = rows.every(r => r[0]);
   return `<h3>人が増えるには</h3><div class="needs">${rows.map(([g, n, v, how]) => `<div class="need ${g ? 'ok' : ''}"><span>${g ? '✓' : '✗'} ${n}</span><span class="nc">${v}</span>${g ? '' : `<span class="nh">${how}</span>`}</div>`).join('')}</div>
-    <p class="fxn">${ok ? '全部そろっている。1日に1人くらい、旅の人が住みつく。' : 'ぜんぶ ✓ になると、1日に1人くらい旅の人が住みつく。掲示板なら、空き家があればすぐ呼べる。'}</p>`;
+    <p class="fxn">${ok ? '全部そろっている。1日に2人くらい、旅の人が住みつく。' : 'ぜんぶ ✓ になると、1日に2人くらい旅の人が住みつく。掲示板なら、空き家があればすぐ呼べる。'}</p>`;
 }
 function births(live) {
   if (!isUnlocked('growth') || S.residents.length >= popCap()) return;
@@ -1308,10 +1308,10 @@ function residentsStep(dtH, X, live) {
   const avg = pop ? S.residents.reduce((s, r) => s + r.sat, 0) / pop : 60;
   if (isUnlocked('growth') && !growthWhy().length) {
     // ゆっくり：条件がそろっても2〜3日に1人くらい。満足度が高いほど少し早い
-    const base = dd;   // 条件がそろえば1日に1人
+    const base = dd * 2;   // 条件がそろえば1日に2人
     const inn = dd * .15 * X.inn;
     S.imm += base + inn;
-    if (S.imm >= 1) { S.imm -= 1; arrive(live, base + inn > 0 && Math.random() < inn / (base + inn) ? 'inn' : null); }
+    while (S.imm >= 1 && beds().total > 0 && S.residents.length < popCap()) { S.imm -= 1; arrive(live, base + inn > 0 && Math.random() < inn / (base + inn) ? 'inn' : null); }
   } else S.imm = Math.min(S.imm, .5);
   if (X.inn > 0) { const gg = 45 * X.inn * X.mult * dd; earn('inn', gg); S.st.today.inn = (S.st.today.inn || 0) + gg; }
 }
@@ -3639,7 +3639,7 @@ const HELP = [
   { k:'store', q:'倉庫がいっぱい', a:['倉庫は食べ物・資材・品物の棚に分かれている。どの棚がいっぱいかは倉庫をタップすると分かる', '倉庫をレベルアップするか、新しく建てる', '倉庫をタップして、余った品を捨てることもできる', '行商人の「自動で売る」をオンにする', '倉庫で配達係を増やすと、運ぶのが早くなる'] },
   { k:'sat', q:'満足度が低い・人が出ていく', a:['「村」のページの「暮らし」に、みんなの望みと満たし方が出る（人が増えると望みも増える）', '住人をタップすると、何が足りないか分かる', '満足度は食べ物・仕事・住む家・家の前の道・まわりの飾りで上がる', '欲しい物が村にないときは、作る建物を建てるか行商人から買う'] },
   { k:'stop', q:'建物に「！」が出ている', a:['タップすると理由が出る（材料が足りない・働き手がいない・季節外れ など）', '材料が足りないときは、材料を作る建物を増やす'] },
-  { k:'pop', q:'人が増えない', a:['「村」のページの「いま」の「人が増えるには」に、そろっていない条件が ✗ で出る', '空き家・満足度50以上・食べ物の余り（2日分）がそろうと、1日に1人くらい来る', '目標ごとに人数の上限がある。目標を進めると増やせる', '広場の掲示板で、お金を払ってすぐに呼べる'] },
+  { k:'pop', q:'人が増えない', a:['「村」のページの「いま」の「人が増えるには」に、そろっていない条件が ✗ で出る', '空き家・満足度50以上・食べ物の余り（2日分）がそろうと、1日に2人くらい来る', '目標ごとに人数の上限がある。目標を進めると増やせる', '広場の掲示板で、お金を払ってすぐに呼べる'] },
   { k:'threat', q:'盗賊や魔物が心配', a:['「目標」で次の脅威と、備えが足りているかが分かる', '見張り塔や兵舎を建てると守りが強くなる', '冒険者ギルドの冒険者が、魔物を退治してくれる'] },
 ];
 function helpNow() {   // いまの村で気になっていそうなこと
