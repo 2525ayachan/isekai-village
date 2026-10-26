@@ -45,6 +45,8 @@ const pwa = `
       document.addEventListener('visibilitychange', function () { if (!document.hidden) reg.update().catch(function () {}); });
     }).catch(function () {});
   }
+  // セーブを「消さないでほしいデータ」としてブラウザに頼む（容量が足りないときに勝手に消されにくくなる）
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persisted().then(function (p) { if (!p) navigator.storage.persist(); }); } catch (e) {}
   hook(); window.addEventListener('online', hook);   // 電波がないときに開いたら、つながったときに登録しなおす
 })();
 </script>
