@@ -764,9 +764,7 @@ const scaleCost = (c, m) => Object.fromEntries(Object.entries(c).map(([k, v]) =>
 const buildCost = type => scaleCost(B[type].cost, Math.pow(1.15, count(type)));
 const upCost = (type, lv) => scaleCost(B[type].cost, Math.pow(1.7, lv));
 function landCost(n = S.land) {
-  const c = {};   // 開拓はお金がかからない（森の奥だけマナが要る）
-  if (n >= 30) c.mana = 2 * (n - 30) + 5;
-  return c;
+  return {};   // 開拓は、1回の依頼で5マスまで無料（6マス以上まとめて頼むときだけマナ。pickCost）
 }
 const RUIN_NAME = { '1x1':'崩れた小屋の跡', '2x1':'古い石の館の跡', '2x2':'古代神殿の跡' };
 function genRuins(s) {
@@ -1150,7 +1148,7 @@ const PERK = {
   elf:'木材がとれる。建てる・直すのに使う',
   mine:'石材と鉄鉱石がとれる',
   lodge:'開拓者が森を切り開き、村が広がる',
-  mage:'マナが集まる。魔法の建物や森の奥の開拓に',
+  mage:'マナが集まる。魔法の建物や、森をまとめて開拓するのに使う',
   bakery:'パンやいちごパイを焼く。ご飯がおいしくなる',
   diner:'スープやオムレツを作る。ご飯がおいしくなる',
   weaver:'羊毛から雲の布を織る',
@@ -4068,7 +4066,7 @@ const GUIDE = [
   { t:'矢印の先のゴードンをタップしてみよう', target:'#map', focus:true, mapTarget:() => { const g = gordon(), a = g && agents.get(g.id); return a && !a.hidden ? [a.x, a.y - 9] : null; },
     onlyRes:() => (gordon() || {}).id, done:() => sel && sel.type === 'res' && sel.id === (gordon() || {}).id },
   { t:'建物や人をタップすると、ここに詳しく出る。×で閉じよう', target:'#panel .sheetx button', done:() => !sel },
-  { t:`上には村の持ち物が出る。<span class="glist"><span><img src="${ICON.gold}" alt="">ゴールド：建てる・直す・人を呼ぶのに使う</span><span><img src="${ICON.wood}" alt=""><img src="${ICON.stone}" alt="">木材・石材：建物の材料</span><span><img src="${ICON.mana}" alt="">マナ：魔法の建物や、森の奥の開拓に使う</span><span><img src="${ICON.pop}" alt="">住人：いる人数／住める人数と、みんなの満足度</span></span>`, target:'#res', ok:true },
+  { t:`上には村の持ち物が出る。<span class="glist"><span><img src="${ICON.gold}" alt="">ゴールド：建てる・直す・人を呼ぶのに使う</span><span><img src="${ICON.wood}" alt=""><img src="${ICON.stone}" alt="">木材・石材：建物の材料</span><span><img src="${ICON.mana}" alt="">マナ：魔法の建物や、森をまとめて開拓するのに使う</span><span><img src="${ICON.pop}" alt="">住人：いる人数／住める人数と、みんなの満足度</span></span>`, target:'#res', ok:true },
   { t:'ここには季節の残り日数と、倉庫に入っている品物の量が出る', target:'#season', ok:true },
   { t:'右上は時刻。⚙を押すと、時間の速さを変えられる', target:'#gear', done:() => modalOpen() && !!$('setspd') },
   { t:'×2を押してみよう', target:'#setspd button[data-spd="2"]', done:() => S.speed === 2 },
