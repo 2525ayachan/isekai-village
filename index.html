@@ -3688,11 +3688,13 @@ function showTitle() {
 }
 function titleMenu() {
   const m = $('tt-menu');
-  m.innerHTML = (hadSave ? '<button class="btn" id="tt-cont"><span>つづきから</span></button>' : '') + '<button class="btn sub" id="tt-new"><span>はじめから</span></button>';
+  // チュートリアルを終えた村だけ「つづきから」を出す（途中の村は、はじめからやり直す）
+  const canCont = hadSave && S.storySeen && !guideActive() && !S.over;
+  m.innerHTML = (canCont ? '<button class="btn" id="tt-cont"><span>つづきから</span></button>' : '') + '<button class="btn sub" id="tt-new"><span>はじめから</span></button>';
   if ($('tt-cont')) $('tt-cont').onclick = e => { e.stopPropagation(); closeTitle(false); };
   $('tt-new').onclick = e => {
     e.stopPropagation();
-    if (!hadSave) { closeTitle(false); return; }
+    if (!canCont) { closeTitle(hadSave); return; }
     m.innerHTML = `<p class="tt-q">これまでのセーブデータは削除されます。<br>よろしいですか？</p>
       <div class="tt-row"><button class="btn sub danger" id="tt-yes"><span>はい</span></button><button class="btn" id="tt-no"><span>いいえ</span></button></div>`;
     $('tt-yes').onclick = ev => { ev.stopPropagation(); closeTitle(true); };
