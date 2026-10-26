@@ -3498,7 +3498,7 @@ function showSettings() {
   $('s-help').onclick = showHelp;
   $('s-reset').onclick = () => {
     if (!settingsArmed) { settingsArmed = true; showSettings(); setTimeout(() => { if (settingsArmed) { settingsArmed = false; if (modalOpen() && $('s-reset')) showSettings(); } }, 3000); return; }
-    settingsArmed = false; closeModal(); freshVillage(); toast('新しい開拓村をはじめた');
+    settingsArmed = false; closeModal(); freshVillage();
   };
   $('s-close').onclick = closeModal;
   $('s-export').onclick = showExport;
@@ -4877,7 +4877,7 @@ $('panel').addEventListener('click', e => {
   if (act === 'tab') { tab = b.dataset.tab; sel = null; }
   else if (act === 'reset') {
     if (armed !== 'reset') { armed = 'reset'; setTimeout(() => { if (armed === 'reset') { armed = null; lastHTML = ''; renderPanel(true); } }, 3000); lastHTML = ''; renderPanel(true); return; }
-    armed = null; freshVillage(); toast('新しい開拓村をはじめた'); return;
+    armed = null; freshVillage(); return;
   }
   else if (act === 'back') sel = null;
   else if (act === 'sel-res') { sel = { type:'res', id:+b.dataset.id }; S.flags.talk = 1; findRes(+b.dataset.id); }
@@ -5119,7 +5119,7 @@ function showOver() {
     </div>
     <button class="btn" id="newgame"><span>新しい村をはじめる</span></button>`;
   $('modal').hidden = false;
-  $('newgame').onclick = () => { $('modal').hidden = true; freshVillage(); toast('新しい開拓村をはじめた'); };
+  $('newgame').onclick = () => { $('modal').hidden = true; freshVillage(); };
 }
 function showWelcome(sec, b) {
   const days = (S.day - b.day) + (S.min - b.min) / 1440;
