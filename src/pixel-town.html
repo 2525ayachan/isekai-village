@@ -914,17 +914,19 @@ const isEdge = i => S.open[i] && NB[i].some(v => !S.open[v]);
 // economy
 // ======================================================================
 // 暮らしの段階（人が増えるほど、欲しがる物が増える）
-const lifeStage = () => { const n = S.residents.length; return n <= 5 ? 1 : n <= 8 ? 2 : n <= 12 ? 3 : 4; };
+// 暮らしの段階（人数で決まる）。後ろの段階ほど、望みが1つずつ増える
+const STAGE_POP = [0, 6, 9, 13, 20, 30, 45, 60];
+const lifeStage = () => { const n = S.residents.length; let s = 1; STAGE_POP.forEach((p, k) => { if (n >= p) s = k + 1; }); return s; };
 function wantsOf(r, job) {
   if (r.child) return {};
   const stg = lifeStage(), w = {};
-  if (stg >= 3) { w.wine = .25; w.cloth = .12; if (r.race === 'elf') { w.cloth += .25; w.wine = .15; } if (r.race === 'dwarf') w.wine += .6; }
-  if (stg >= 4 && r.race === 'beast') w.potion = .2;
+  if (stg >= 5) { w.wine = .25; w.cloth = .12; if (r.race === 'elf') { w.cloth += .25; w.wine = .15; } if (r.race === 'dwarf') w.wine += .6; }   // 欲しい物は「活気ある村」から
+  if (stg >= 6 && r.race === 'beast') w.potion = .2;
   if (job === 'guild') { w.potion = (w.potion || 0) + 1; w.sword = .15; w.armor = .03; w.elixir = .03; }
   if (job === 'mage' || job === 'alchemy') { w.mpotion = .6; w.robe = .08; }
-  if (job === 'mine' || job === 'smith') w.wine += .3;
+  if (job === 'mine' || job === 'smith') w.wine = (w.wine || 0) + .3;
   const se = cal().season;
-  if (stg >= 4) { if (se === 0) w.oil = .15; if (se === 1) w.juice = .3; if (se === 2) w.stew = .3; }
+  if (stg >= 6) { if (se === 0) w.oil = .15; if (se === 1) w.juice = .3; if (se === 2) w.stew = .3; }
   if (se === 3 && job === 'guild') w.icesword = .1;
   return w;
 }
@@ -1137,7 +1139,11 @@ const STAGE = [
   { name:'その日暮らし', range:'5人まで', bonus:15 },
   { name:'ふつうの暮らし', range:'6〜8人', bonus:10 },
   { name:'ゆたかな暮らし', range:'9〜12人', bonus:5 },
-  { name:'にぎやかな村', range:'13人から', bonus:0 },
+  { name:'にぎやかな村', range:'13〜19人', bonus:0 },
+  { name:'活気ある村', range:'20〜29人', bonus:0 },
+  { name:'小さな町', range:'30〜44人', bonus:0 },
+  { name:'豊かな町', range:'45〜59人', bonus:0 },
+  { name:'都をめざす町', range:'60人から', bonus:0 },
 ];
 const NEEDS = [
   { st:1, k:'eat', name:'食べ物がある', pen:10, ok:r => r.fFood >= .4, how:'畑を増やして、働く人を決める' },
@@ -1145,10 +1151,10 @@ const NEEDS = [
   { st:2, k:'road', name:'家の前に道がある', pen:5, ok:r => r.home != null && roadNear(r.home), how:'家の前まで道を引く' },
   { st:2, k:'work', name:'仕事がある', pen:5, ok:r => r.job != null || r.clearing != null, how:'職場を建てて、仕事を割り振る' },
   { st:3, k:'deco', name:'家のまわりに飾りがある', pen:6, ok:r => decoBonus(r, lastX) > 0, how:'家の近くに花壇などを置く' },
-  { st:3, k:'want', name:'欲しい物が届いている', pen:6, ok:r => r.fWant >= .5, how:'星の実酒や布などを作るか、行商人から買う' },
-  { st:3, k:'rest', name:'憩いの場がある（酒場など）', pen:6, ok:() => count('tavern') > 0 || count('spring') > 0, how:'酒場を建てる' },
-  { st:4, k:'feast', name:'ご飯がとてもおいしい', pen:6, ok:r => r.fFood >= .9, how:'食堂のオムレツやパン屋のいちごパイを作る' },
-  { st:4, k:'school', name:'子供が通える学舎がある', pen:4, ok:() => count('school') > 0, how:'学舎を建てて先生を決める' },
+  { st:5, k:'want', name:'欲しい物が届いている', pen:6, ok:r => r.fWant >= .5, how:'酒場の星の実酒や、機織り小屋の雲の布を倉庫に置いておく（行商人から買ってもいい）' },
+  { st:6, k:'rest', name:'憩いの場がある（酒場など）', pen:6, ok:() => count('tavern') > 0 || count('spring') > 0, how:'酒場を建てる' },
+  { st:7, k:'feast', name:'ご飯がとてもおいしい', pen:6, ok:r => r.fFood >= .9, how:'食堂のオムレツやパン屋のいちごパイを作る' },
+  { st:8, k:'school', name:'子供が通える学舎がある', pen:4, ok:() => count('school') > 0, how:'学舎を建てて先生を決める' },
 ];
 const needsNow = () => NEEDS.filter(n => n.st <= lifeStage());
 function satParts(r, X) {
@@ -1803,7 +1809,7 @@ function stageCheck(live) {
   if (S.stageSeen == null) { S.stageSeen = st; return; }
   if (st > S.stageSeen && live) {
     const add = NEEDS.filter(n => n.st > S.stageSeen && n.st <= st).map(n => n.name).join('・');
-    noteQ.push({ who:0, t:`村も${S.residents.length}人になった。暮らしの段階が「${STAGE[st].name}」に上がったぞ。みんなの望みも増えた：${add}。` });
+    noteQ.push({ who:0, t:`村も${S.residents.length}人になった。暮らしの段階が「${STAGE[st].name}」に上がったぞ。${add ? `みんなの望みも増えた：${add}。` : '望みは今のままじゃ。'}` });
   }
   S.stageSeen = Math.max(S.stageSeen, st);
 }
@@ -4455,11 +4461,11 @@ function autoJobs() {
   toast(out.length ? `仕事を決めた：${out.join('、')}` : '空いている職場がありません');
 }
 function stageHTML() {
-  const stg = lifeStage(), ad = S.residents.filter(r => !r.child), nx = NEEDS.filter(n => n.st === stg + 1);
+  const stg = lifeStage(), ad = S.residents.filter(r => !r.child), nst = NEEDS.filter(n => n.st > stg).reduce((m, n) => Math.min(m, n.st), 99), nx = NEEDS.filter(n => n.st === nst);
   const rows = needsNow().map(n => { let c = 0; ad.forEach(r => { try { if (n.ok(r)) c++; } catch (e) {} }); const all = c >= ad.length;
     return `<div class="need ${all ? 'ok' : ''}"><span>${all ? '✓' : '・'} ${n.name}</span><span class="nc">${c}/${ad.length}人</span>${all ? '' : `<span class="nh">${n.how}</span>`}</div>`; }).join('');
   return `<h3>暮らしの段階 ${stg}：${STAGE[stg].name}（${STAGE[stg].range}）</h3><p class="fxn">人が増えると、みんなの望みも増える。満たすほど満足度が上がる。</p>
-    <div class="needs">${rows}</div>${nx.length ? `<p class="fxn">次の段階（${STAGE[stg + 1].range}）で増える望み：${nx.map(n => n.name).join('・')}</p>` : ''}`;
+    <div class="needs">${rows}</div>${nx.length ? `<p class="fxn">${STAGE[nst].name}（${STAGE[nst].range}）で増える望み：${nx.map(n => n.name).join('・')}</p>` : ''}`;
 }
 let vTab = 'now';
 function villageTab() {
