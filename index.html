@@ -399,8 +399,8 @@ details.help summary { cursor: pointer; } details.help ul { margin: 6px 0 0; pad
 .title .tt-q { margin: 0; font-size: .95rem; line-height: 1.6; color: #f7edd6; }
 .title .tt-row { display: flex; gap: 10px; } .title .tt-row .btn { flex: 1; }
 .modal { flex-direction: column; }
-.skiplink { margin-top: 14px; color: #e9d6b0; font-size: .95rem; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-.skiplink[hidden] { display: none; }
+.talk .tb { flex-wrap: wrap; }
+.talk .tb .tskip { order: 9; flex-basis: 100%; text-align: right; background: none; color: var(--ink-dim); font-size: .72rem; padding: 2px 0 0; text-decoration: underline; }
 .modal.dark { background: radial-gradient(ellipse at 50% 40%, #3a2a1c, #140e08 75%); }
 .modal .box { width: 100%; max-width: 360px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
 .modal h3 { margin: 0; font-weight: 400; font-size: 1.3rem; color: var(--accent); }
@@ -3491,7 +3491,7 @@ function updateTop() {
 // 設定・物語・チュートリアル
 // ======================================================================
 const modalOpen = () => !$('modal').hidden;
-function closeModal() { if ($('st-skip')) $('st-skip').hidden = true; $('modal').hidden = true; $('modal').onclick = null; $('modal').classList.remove('dark'); }
+function closeModal() { $('modal').hidden = true; $('modal').onclick = null; $('modal').classList.remove('dark'); }
 let settingsArmed = false;
 function showSettings() {
   const sp = [[0, '止める'], [1, '×1'], [2, '×2'], [4, '×4']];
@@ -3650,11 +3650,6 @@ function showStory(k) {
     if (!S.storySeen) { S.storySeen = true; S.tut.on = true; S.guide = { i:0, t:NOW }; save(); renderMission(); renderGuide(true); }
   };
   if ($('st-back')) $('st-back').onclick = () => showStory(k - 1);
-  // 箱の下に、文字だけのリンク（はじめての物語のときだけ）
-  let sk = $('st-skip');
-  if (!sk) { sk = document.createElement('a'); sk.id = 'st-skip'; sk.href = '#'; sk.className = 'skiplink'; sk.textContent = 'チュートリアルをスキップ'; $('modal').appendChild(sk); }
-  sk.hidden = !!S.storySeen;
-  sk.onclick = e => { e.preventDefault(); sk.hidden = true; $('modalBox').className = 'box win'; closeModal(); tutSkipAll(); };
 }
 
 // ======================================================================
@@ -3712,6 +3707,15 @@ function closeTitle(fresh) {
   if (fresh) { freshVillage(); return; }   // 新しい村（物語から）
   if (!S.storySeen && !S.over) showStory(0);
 }
+// はじめての操作（地図の動かし方など）だけを飛ばして、ゴードンとリナの話へ
+function skipOps() {
+  if (modalOpen()) closeModal();
+  sel = null; S.guide.i = GUIDE.length; S.guide.t = NOW;
+  save(); lastGuideKey = ''; lastTalk = ''; renderPanel(true); renderGuide(true);
+}
+// スキップは2回押しで確定（うっかり防止）
+let skipArmed = 0;
+const armSkip = (el, label, go) => { el.onclick = e => { e.stopPropagation(); if (NOW - skipArmed < 3000) { skipArmed = 0; go(); return; } skipArmed = NOW; el.textContent = 'もう一度押すとスキップ'; setTimeout(() => { if (el.isConnected) el.textContent = label; }, 3000); }; };
 // チュートリアルを飛ばす：「チュートリアル完了」と同じ状態にする
 function tutSkipAll() {
   S.storySeen = true; S.tut.on = true;
@@ -3726,7 +3730,13 @@ function tutSkipAll() {
   const lina = founders()[1], fi = fieldAnchor(), nw = tutNew(), wi = whAnchor();
   if (fi >= 0 && !hasWorker('field') && lina) setJob(lina, fi);
   if (wi >= 0 && !hasWorker('warehouse') && nw) setJob(nw, wi);
-  earn('goal', 30 + 20 + 30); add('wood', 20);   // 途中のごほうびもまとめて
+  if (roadMode) $('roadbtn').click();
+  if (layoutMode) setLayout(false);
+  if (modalOpen()) closeModal();
+  sel = null;
+  // まだ受け取っていない途中のごほうびを、まとめて渡す
+  const from = Math.max(0, (S.guide.i || 0) - GUIDE.length);
+  TALK.slice(from).forEach(st => { if (st.gold) earn('goal', st.gold); if (st.wood) add('wood', st.wood); });
   S.flags.road = S.flags.moved = 1;
   S.guide = { i: GUIDE.length + TALK.length, t: NOW };
   ['people', 'village', 'mission'].forEach(v => unlock(v, true));
@@ -4072,9 +4082,10 @@ function renderGuide(force) {
       if (key !== lastGuideKey || force) {
         const head = inMg ? `<span class="gs">ミッション：${curList()[S.mg.m].name}（${S.mg.i + 1}/${stepsOf(curList()[S.mg.m]).length}）</span>` : S.guide.i < GUIDE.length ? `<span class="gs">はじめての操作 ${S.guide.i + 1}/${GUIDE.length}</span>` : '';
         $('gbub').innerHTML = `${head}<span class="gt">${gs.t}</span>
-          ${gs.ok ? `<span class="grow" style="justify-content:flex-end"><button class="gok" id="g-ok">${gs.ok === true ? 'わかった' : gs.ok}</button></span>` : ''}${inMg ? `<span class="grow"><button class="gskip" id="g-stop">やめる</button></span>` : ''}`;
+          ${gs.ok ? `<span class="grow" style="justify-content:flex-end"><button class="gok" id="g-ok">${gs.ok === true ? 'わかった' : gs.ok}</button></span>` : ''}${inMg ? `<span class="grow"><button class="gskip" id="g-stop">やめる</button></span>` : S.guide.i < GUIDE.length ? `<span class="grow"><button class="gskip" id="g-skip">操作の説明をスキップ</button></span>` : `<span class="grow"><button class="gskip" id="g-skip">チュートリアルをスキップ</button></span>`}`;
         if ($('g-ok')) $('g-ok').onclick = inMg ? () => { S.mg.i++; S.mg.t = NOW; if (S.mg.i >= stepsOf(curList()[S.mg.m]).length) S.mg = null; lastGuideKey = ''; renderGuide(true); } : guideNext;
         if ($('g-stop')) $('g-stop').onclick = stopMg;
+        if ($('g-skip')) { const ops = S.guide.i < GUIDE.length; armSkip($('g-skip'), ops ? '操作の説明をスキップ' : 'チュートリアルをスキップ', ops ? skipOps : tutSkipAll); }
         const te = document.querySelector(gs.target); if (te && te.scrollIntoView && te.closest('#panel')) te.scrollIntoView({ block:'nearest' });
         lastGuideKey = key;
       }
@@ -4103,8 +4114,9 @@ function renderGuide(force) {
     if (pt) { S.guide.focused = S.guide.i; cam.z = clamp(Math.max(cam.z, vw / (7 * T)), zMin(), 12); focusTut(pt); }
   }
   tk.innerHTML = `${who ? `<img src="${faceOf(who)}" alt="">` : '<span></span>'}<span><b>${who ? who.name : ''}</b><br><span class="tx">「${ts.t}」</span></span>
-    <span class="tb">${ts.hint ? `<span class="th">${ts.hint}</span>` : ''}${ts.next ? '<button class="tnext" id="t-next">つぎへ</button>' : ''}</span>`;
+    <span class="tb"><button class="tskip" id="t-skip">チュートリアルをスキップ</button>${ts.hint ? `<span class="th">${ts.hint}</span>` : ''}${ts.next ? '<button class="tnext" id="t-next">つぎへ</button>' : ''}</span>`;
   if ($('t-next')) $('t-next').onclick = guideNext;
+  armSkip($('t-skip'), 'チュートリアルをスキップ', tutSkipAll);
   lastTalk = key;
 }
 let guideDoneAt = 0;
