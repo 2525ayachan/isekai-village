@@ -4393,7 +4393,13 @@ function evRow(e, full) {
   const have = e.type === 'deliver' ? Math.floor(S.inv[e.item] || 0) : 0;
   const dbtn = !full && !e.done && e.type === 'deliver' ? `<button class="mini" data-act="deliver" data-ev="${S.ev.list.indexOf(e)}" ${have >= 1 ? '' : 'disabled'}>納品</button>` : '';
   return `<div class="ev ${threat ? 'threat' : ''} ${e.done ? 'done' : ''}"><span class="tg">${e.done ? '達成' : lbl}</span><span>${e.title}${judge}</span><span class="n">${val} ${dbtn}</span>
-    <div class="bar ${threat ? (ok ? 'ok' : 'bad') : ''}"><i style="width:${clamp(a / b * 100, 0, 100).toFixed(0)}%"></i></div>${full ? `<p style="grid-column:1/-1">${evText(e)}${e.reward ? `。報酬：${ioText(e.reward)}` : ''}</p>` : ''}</div>`;
+    <div class="bar ${threat ? (ok ? 'ok' : 'bad') : ''}"><i style="width:${clamp(a / b * 100, 0, 100).toFixed(0)}%"></i></div>${full ? `<p style="grid-column:1/-1">${evText(e)}${e.reward ? `。報酬：${ioText(e.reward)}` : ''}</p>` : ''}${threat && !e.done ? `<p class="fxn" style="grid-column:1/-1">${threatHint(e, a, b)}</p>` : ''}</div>`;
+}
+// 脅威への備え方（何をすれば足りるか）
+function threatHint(e, a, b) {
+  if (e.type === 'defense') return `防衛力は、見張り塔（見張り番つき）1つで+5、兵舎（兵士2人）で+12、冒険者1人で+2、倉庫の剣1本で+1。${a >= b ? 'いまは足りている。季節末までこのまま' : `あと${b - a}足りない`}`;
+  const rate = huntRate(), left = Math.max(0, SEASON_DAYS + 1 - cal().inSeason - S.min / 1440), proj = Math.floor(a + rate * left);
+  return `見張り塔（見張り番つき）・兵舎・冒険者が、毎日少しずつ魔物を倒す（見張り塔1つで1日0.4、兵舎で0.6、冒険者1人で0.5〜1.5）。いまは1日${rate.toFixed(1)}、このままだと季節末に約${proj}${proj >= b ? '（足りる）' : `（${b - proj}足りない。見張り塔を増やそう）`}`;
 }
 function deliver(k) {
   const e = S.ev && S.ev.list[k];
