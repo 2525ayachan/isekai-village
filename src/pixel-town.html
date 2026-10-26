@@ -380,7 +380,9 @@ details.help summary { cursor: pointer; } details.help ul { margin: 6px 0 0; pad
 .title .tt-menu .btn { justify-content: center; font-size: 1.05rem; padding: 12px; }
 .title .tt-q { margin: 0; font-size: .95rem; line-height: 1.6; color: #f7edd6; }
 .title .tt-row { display: flex; gap: 10px; } .title .tt-row .btn { flex: 1; }
-.sbtns .skip { width: 100%; }
+.modal { flex-direction: column; }
+.skiplink { margin-top: 14px; color: #e9d6b0; font-size: .95rem; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.skiplink[hidden] { display: none; }
 .modal.dark { background: radial-gradient(ellipse at 50% 40%, #3a2a1c, #140e08 75%); }
 .modal .box { width: 100%; max-width: 360px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
 .modal h3 { margin: 0; font-weight: 400; font-size: 1.3rem; color: var(--accent); }
@@ -3471,7 +3473,7 @@ function updateTop() {
 // 設定・物語・チュートリアル
 // ======================================================================
 const modalOpen = () => !$('modal').hidden;
-function closeModal() { $('modal').hidden = true; $('modal').onclick = null; $('modal').classList.remove('dark'); }
+function closeModal() { if ($('st-skip')) $('st-skip').hidden = true; $('modal').hidden = true; $('modal').onclick = null; $('modal').classList.remove('dark'); }
 let settingsArmed = false;
 function showSettings() {
   const sp = [[0, '止める'], [1, '×1'], [2, '×2'], [4, '×4']];
@@ -3622,7 +3624,7 @@ function showStory(k) {
     <div class="pic">${pg.pic}</div><p>${pg.text}</p>
     <div class="pg">${k + 1} / ${pages.length}</div>
     <div class="sbtns">${k > 0 ? '<button class="btn sub" id="st-back">もどる</button>' : ''}<button class="btn" id="st-next"><span>${last ? '開拓をはじめる' : 'つぎへ'}</span></button></div>
-    ${!S.storySeen ? '<div class="sbtns"><button class="btn sub skip" id="st-skip">チュートリアルをスキップ</button></div>' : ''}`;
+`;
   $('modal').hidden = false;
   $('st-next').onclick = () => {
     if (!last) { showStory(k + 1); return; }
@@ -3630,7 +3632,11 @@ function showStory(k) {
     if (!S.storySeen) { S.storySeen = true; S.tut.on = true; S.guide = { i:0, t:NOW }; save(); renderMission(); renderGuide(true); }
   };
   if ($('st-back')) $('st-back').onclick = () => showStory(k - 1);
-  if ($('st-skip')) $('st-skip').onclick = () => { $('modalBox').className = 'box win'; closeModal(); tutSkipAll(); };
+  // 箱の下に、文字だけのリンク（はじめての物語のときだけ）
+  let sk = $('st-skip');
+  if (!sk) { sk = document.createElement('a'); sk.id = 'st-skip'; sk.href = '#'; sk.className = 'skiplink'; sk.textContent = 'チュートリアルをスキップ'; $('modal').appendChild(sk); }
+  sk.hidden = !!S.storySeen;
+  sk.onclick = e => { e.preventDefault(); sk.hidden = true; $('modalBox').className = 'box win'; closeModal(); tutSkipAll(); };
 }
 
 // ======================================================================
