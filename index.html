@@ -385,6 +385,20 @@ details.help summary { cursor: pointer; } details.help ul { margin: 6px 0 0; pad
 .modal .box { max-height: calc(100dvh - 40px); overflow-y: auto; }
 .modal { position: fixed; inset: 0; background: rgba(60,40,20,.55); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 30; }
 .modal[hidden] { display: none; }
+/* タイトル画面 */
+.title { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 24px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  background: radial-gradient(ellipse at 50% 35%, #3a2a1c, #140e08 80%); color: #f7edd6; text-align: center; user-select: none; -webkit-user-select: none; }
+.title[hidden] { display: none; }
+.title .tt-art { width: min(88vw, 420px); image-rendering: pixelated; border: 3px solid #a8703e; border-radius: 6px; box-shadow: 0 0 0 3px #5a3a22, 0 10px 30px rgba(0,0,0,.5); }
+.title h1 { margin: 0; font-weight: 400; font-size: clamp(1.7rem, 8vw, 2.4rem); color: #ffd34e; letter-spacing: .06em; text-shadow: 0 3px 0 #5a3a22, 0 0 18px rgba(255,211,78,.25); }
+.title .tt-sub { margin: -8px 0 0; font-size: .9rem; color: #e9d6b0; }
+.title .tt-menu { display: flex; flex-direction: column; gap: 10px; width: min(78vw, 300px); min-height: 120px; justify-content: flex-start; }
+.title .tt-tap { margin: 16px 0 0; font-size: 1rem; color: #f7edd6; animation: ttblink 1.4s ease-in-out infinite; }
+@keyframes ttblink { 50% { opacity: .35; } }
+.title .tt-menu .btn { justify-content: center; font-size: 1.05rem; padding: 12px; }
+.title .tt-q { margin: 0; font-size: .95rem; line-height: 1.6; color: #f7edd6; }
+.title .tt-row { display: flex; gap: 10px; } .title .tt-row .btn { flex: 1; }
+.sbtns .skip { width: 100%; }
 .modal.dark { background: radial-gradient(ellipse at 50% 40%, #3a2a1c, #140e08 75%); }
 .modal .box { width: 100%; max-width: 360px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
 .modal h3 { margin: 0; font-weight: 400; font-size: 1.3rem; color: var(--accent); }
@@ -3625,7 +3639,8 @@ function showStory(k) {
   $('modalBox').innerHTML = `${k === 0 ? '<h3>プロローグ　忘れられた村</h3>' : ''}
     <div class="pic">${pg.pic}</div><p>${pg.text}</p>
     <div class="pg">${k + 1} / ${pages.length}</div>
-    <div class="sbtns">${k > 0 ? '<button class="btn sub" id="st-back">もどる</button>' : ''}<button class="btn" id="st-next"><span>${last ? '開拓をはじめる' : 'つぎへ'}</span></button></div>`;
+    <div class="sbtns">${k > 0 ? '<button class="btn sub" id="st-back">もどる</button>' : ''}<button class="btn" id="st-next"><span>${last ? '開拓をはじめる' : 'つぎへ'}</span></button></div>
+    ${!S.storySeen ? '<div class="sbtns"><button class="btn sub skip" id="st-skip">チュートリアルをスキップ</button></div>' : ''}`;
   $('modal').hidden = false;
   $('st-next').onclick = () => {
     if (!last) { showStory(k + 1); return; }
@@ -3633,6 +3648,84 @@ function showStory(k) {
     if (!S.storySeen) { S.storySeen = true; S.tut.on = true; S.guide = { i:0, t:NOW }; save(); renderMission(); renderGuide(true); }
   };
   if ($('st-back')) $('st-back').onclick = () => showStory(k - 1);
+  if ($('st-skip')) $('st-skip').onclick = () => { $('modalBox').className = 'box win'; closeModal(); tutSkipAll(); };
+}
+
+// ======================================================================
+// タイトル画面：タップ →「つづきから」「はじめから」→（はじめから）確認
+// ======================================================================
+let titleOn = false, hadSave = false;
+function titleArt() {
+  const Wt = 12, Ht = 7, at = (x, y) => [x * 16, y * 16];
+  return iconURL(Wt * 16, Ht * 16, () => {
+    for (let y = 0; y < Ht; y++) for (let x = 0; x < Wt; x++) {
+      const [px, py] = at(x, y), i = y * 31 + x * 7 + 3;
+      if (y === 0 || x === 0 || x === Wt - 1) drawForest(px, py, i); else drawGrass(px, py, i);
+    }
+    for (let x = 0; x < Wt; x++) outlined(x * 16, 0, 16, 16, () => forestDeco(x * 16, 0, x * 13 + 5));
+    for (let y = 1; y < Ht; y++) { outlined(0, y * 16, 16, 16, () => forestDeco(0, y * 16, y * 7 + 3)); outlined((Wt - 1) * 16, y * 16, 16, 16, () => forestDeco((Wt - 1) * 16, y * 16, y * 5 + 9)); }
+    // 広場と井戸・掲示板
+    const [qx, qy] = at(5, 3);
+    for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) drawPlaza(qx + dx * 16, qy + dy * 16);
+    outlined(qx, qy, 32, 32, () => { drawWell(qx, qy); drawBoard(qx, qy); });
+    // 道
+    [[4, 4], [3, 4], [7, 3], [8, 3], [6, 5], [6, 6]].forEach(([x, y]) => { const [px, py] = at(x, y); p(px + 4, py + 4, 8, 8, C.path); p(px, py + 4, 16, 8, C.path); });
+    // 家・パン屋・木工房・畑・牧場
+    const bld = (x, y, f, t) => { const [px, py] = at(x, y); outlined(px, py, 16, 16, () => f(px, py, t || { lv:1 }, x * 3 + y)); };
+    bld(3, 2, drawHouse, { b:'house', lv:1 }); bld(4, 1, drawHouse, { b:'house', lv:1 }); bld(8, 2, drawHouse, { b:'house', lv:1 });
+    bld(2, 4, drawBakery, { b:'bakery', lv:1 }); bld(9, 4, drawElf, { b:'elf', lv:1 }); bld(8, 5, drawLodge, { b:'lodge', lv:1 });
+    for (const [x, y] of [[3, 5], [4, 5]]) { const [px, py] = at(x, y); drawField(px, py, { b:'field', lv:1, r:'wheat', prog:.9, loaded:true }, x + y * 3); }
+    bld(9, 1, drawSheep, { b:'sheep', lv:1 });
+  });
+}
+function showTitle() {
+  titleOn = true;
+  let el = $('title');
+  if (!el) { el = document.createElement('div'); el.id = 'title'; el.className = 'title'; document.body.appendChild(el); }
+  el.hidden = false;
+  el.innerHTML = `<img class="tt-art" alt="" src="${titleArt()}"><h1>異世界辺境開拓記</h1><p class="tt-sub">忘れられた村を、もう一度にぎやかに</p><div class="tt-menu" id="tt-menu"><p class="tt-tap">画面をタップしてはじめる</p></div>`;
+  el.onclick = () => { el.onclick = null; titleMenu(); };
+}
+function titleMenu() {
+  const m = $('tt-menu');
+  m.innerHTML = (hadSave ? '<button class="btn" id="tt-cont"><span>つづきから</span></button>' : '') + '<button class="btn sub" id="tt-new"><span>はじめから</span></button>';
+  if ($('tt-cont')) $('tt-cont').onclick = e => { e.stopPropagation(); closeTitle(false); };
+  $('tt-new').onclick = e => {
+    e.stopPropagation();
+    if (!hadSave) { closeTitle(false); return; }
+    m.innerHTML = `<p class="tt-q">これまでのセーブデータは削除されます。<br>よろしいですか？</p>
+      <div class="tt-row"><button class="btn sub danger" id="tt-yes"><span>はい</span></button><button class="btn" id="tt-no"><span>いいえ</span></button></div>`;
+    $('tt-yes').onclick = ev => { ev.stopPropagation(); closeTitle(true); };
+    $('tt-no').onclick = ev => { ev.stopPropagation(); titleMenu(); };
+  };
+}
+function closeTitle(fresh) {
+  titleOn = false; $('title').hidden = true; last = performance.now();
+  if (fresh) { freshVillage(); return; }   // 新しい村（物語から）
+  if (!S.storySeen && !S.over) showStory(0);
+}
+// チュートリアルを飛ばす：「チュートリアル完了」と同じ状態にする
+function tutSkipAll() {
+  S.storySeen = true; S.tut.on = true;
+  S.seenScene = S.seenScene || {}; S.seenScene.settler = 1; S.sceneQ = (S.sceneQ || []).filter(q => q.id !== 'settler');
+  const o = innRuin();
+  if (o && S.tutHouse == null) {
+    ruinTiles(o).forEach(j => { S.open[j] = true; S.road[j] = false; });
+    S.ruins = S.ruins.filter(q => q !== o);
+    const ra = t2h(o.a); S.tiles[ra] = { b:'house', lv:1, r:null, prog:0, loaded:false }; S.tutHouse = ra; settle(ra);
+  }
+  if (S.tutNew == null && beds().total > 0) { arrive(false, 'event', 'human'); S.tutNew = S.residents[S.residents.length - 1].id; }
+  const lina = founders()[1], fi = fieldAnchor(), nw = tutNew(), wi = whAnchor();
+  if (fi >= 0 && !hasWorker('field') && lina) setJob(lina, fi);
+  if (wi >= 0 && !hasWorker('warehouse') && nw) setJob(nw, wi);
+  earn('goal', 30 + 20 + 30); add('wood', 20);   // 途中のごほうびもまとめて
+  S.flags.road = S.flags.moved = 1;
+  S.guide = { i: GUIDE.length + TALK.length, t: NOW };
+  ['people', 'village', 'mission'].forEach(v => unlock(v, true));
+  earn('goal', G_REWARD); S.tut.seen = -1;
+  DEM = demand(); assign(); lastX = context();
+  save(); lastTalk = ''; lastHTML = ''; renderGuide(true); renderMission(); renderPanel(true); updateTop();
+  toast(`チュートリアル完了！ お礼に${G_REWARD}ゴールド。「目標」からミッションを始めよう`);
 }
 
 // ミッション：村人の助言＋やり方。達成するとゴールドがもらえる
@@ -5049,7 +5142,7 @@ function frame(now) {
   const dt = Math.min(.25, (now - last) / 1000); last = now; NOW = now;
   if (S.over) { if ($('modal').hidden) showOver(); draw(dt); return; }
   applySeason();
-  const boost = nightBoost(), spd = scene || modalOpen() || guideStep() || (mgStep() && !mgStep().noPause) ? 0 : S.speed;
+  const boost = nightBoost(), spd = titleOn || scene || modalOpen() || guideStep() || (mgStep() && !mgStep().noPause) ? 0 : S.speed;
   if (scene) sceneFrame(); else startScene();
   if (!scene && (guideActive() || S.mg || noteQ.length || !$('talk').hidden || !$('gbub').hidden)) renderGuide(false);
   if (spd > 0) { inSim = true; try { simStep(dt * GMIN * BASE_SPEED * spd * boost / 60, true); } finally { inSim = false; } }
@@ -5071,7 +5164,8 @@ window.addEventListener('resize', () => { if (S && guideActive()) renderGuide(fa
 
 function start(data) {
   const hot = data && valid(data.S);
-  S = hot ? data.S : (load() || newState());
+  const ld = hot ? null : load(); hadSave = !!ld;
+  S = hot ? data.S : (ld || newState());
   if (!S.half) migrateHalf(S);
   rebuildOcc();
   if (!S.ev) genEvents(false);
@@ -5118,7 +5212,8 @@ function start(data) {
   FOREST_ICON = iconURL(32, 48, () => { g.scale(2, 2); drawForest(0, 8, 7); outlined(0, 8, 16, 16, () => forestDeco(0, 8, 7)); });
   RUIN_ICON = iconURL(32, 48, () => { g.scale(2, 2); drawGrass(0, 8, 3); outlined(0, 8, 16, 16, () => drawRuin({ a:0, w:1, h:1 })); });
   renderPanel(true); updateTop();
-  if (!S.storySeen && !S.over) showStory(0);
+  if (hot) { if (!S.storySeen && !S.over) showStory(0); }
+  else showTitle();
   renderGuide(true);
   requestAnimationFrame(loop);
 }
