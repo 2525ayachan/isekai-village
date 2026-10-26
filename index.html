@@ -2323,11 +2323,14 @@ function drawDiner(x, y, t, i) {
   smoke(x + 4, y - 1, i, '#f3e6d0');
 }
 function drawCoop(x, y) {
-  p(x + 1, y + 8, 14, 1, C.woodL); p(x + 1, y + 14, 14, 1, C.woodL);
-  p(x + 1, y + 8, 1, 7, C.woodL); p(x + 14, y + 8, 1, 7, C.woodL);
-  p(x + 2, y + 3, 7, 5, C.wood); p(x + 1, y + 2, 9, 1, C.roof); p(x + 2, y + 1, 7, 1, C.roof);
-  p(x + 4, y + 5, 2, 3, C.dark);
-  p(x + 10, y + 12, 3, 1, C.wheat); p(x + 11, y + 11, 2, 1, C.wheat);
+  // 地面の囲い（全体がコカトリスの遊び場）。すみに低い巣箱とエサ
+  p(x + 2, y + 4, 12, 10, '#c8b27a');
+  [[3, 6], [8, 5], [11, 9], [5, 11], [12, 12], [7, 9]].forEach(([a, b]) => p(x + a, y + b, 1, 1, '#a88e58'));
+  p(x + 1, y + 3, 14, 1, C.woodL); p(x + 1, y + 14, 14, 1, C.woodL);
+  p(x + 1, y + 3, 1, 12, C.woodL); p(x + 14, y + 3, 1, 12, C.woodL);
+  for (let c = 1; c < 16; c += 4) { p(x + c, y + 2, 1, 2, C.woodD); p(x + c, y + 13, 1, 2, C.woodD); }
+  p(x + 2, y + 4, 4, 2, C.wood); p(x + 2, y + 4, 4, 1, C.roof); p(x + 3, y + 5, 2, 1, C.wheat);
+  p(x + 11, y + 11, 3, 1, C.wheat); p(x + 12, y + 10, 2, 1, C.wheat);
 }
 function drawSheep(x, y) {
   p(x + 2, y + 4, 12, 10, '#78c060');
@@ -2463,10 +2466,10 @@ function lightLocal(t, i, on) {
   const wf = WINDOWS[t.b];
   if (wf && on) wf(t).forEach(([a, b, w, h]) => glow(a, b, w, h, t.b === 'alchemy' ? '#7fe08a' : C.lamp));
 }
-const FLAT = new Set(['plaza', 'field', 'sheep']);
+const FLAT = new Set(['plaza', 'field', 'sheep', 'coop']);
 function drawB(t, i, lit, on) {
   const [w, h] = sizeOf(t), x = (i % HW) * 8, y = Math.floor(i / HW) * 8, s = Math.min(w, h);
-  if (!lit && t.b === 'sheep') {   // 牧場は地面：ふちどりなしで、人より先に描く
+  if (!lit && (t.b === 'sheep' || t.b === 'coop')) {   // 牧場や小屋の囲いは地面：ふちどりなしで、人より先に描く
     g.save(); g.translate(x + (w - s) * T / 2, y + (h - s) * T); g.scale(s, s); DRAW[t.b](0, 0, t, i); g.restore();
     drawAnimals(x, y, t, i, w, h);
     return;
@@ -2634,7 +2637,7 @@ function drawAnimals(x, y, t, i, w = 1, h = 1) {
     const n = Math.min(t.pets || 0, 16);
     for (let k = 0; k < n; k++) {
       const ph = NOW / 1000 + k * 1.7 + i;
-      const ax = x + 3 + ((k * 5 + Math.sin(ph * .7) * 2 + 20) % (w * 16 - 9)), ay = y + h * 16 - 5 - (k % 3) * 2;
+      const ax = x + 4 + ((k * 7 + Math.sin(ph * .7) * 2 + 20) % (w * 16 - 11)), ay = y + 9 + ((k * 5 + 3) % Math.max(1, h * 16 - 13));   // 囲いの中に散らばる
       const peck = Math.floor(ph * 2) % 3 === 0;
       g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(ax + 1, ay, 3, .5);
       spr(ax - .5, ay - 4.5, withOutline(peck ? COCK_PECK : COCK), APAL, Math.sin(ph * .7) < 0);
